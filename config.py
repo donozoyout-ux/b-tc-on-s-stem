@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     PORT: int = 8000
 
     # --- Borsa Ayarları (CCXT) ---
-    EXCHANGE_ID: str = Field(default="binance", description="Desteklenen CCXT borsası (binance, bybit, okx)")
+    EXCHANGE_ID: str = Field(default="binanceusdm", description="Desteklenen CCXT borsası (binanceusdm, binance, bybit, okx)")
     API_KEY: str = Field(
         default="",
         validation_alias=AliasChoices("API_KEY", "EXCHANGE_API_KEY"),

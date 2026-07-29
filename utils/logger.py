@@ -2,6 +2,12 @@ import sys
 import logging
 from typing import Any
 
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 
 def setup_logger(name: str = "TradingBot") -> logging.Logger:
     """
