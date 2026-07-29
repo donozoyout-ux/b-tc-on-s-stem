@@ -1,4 +1,6 @@
 import asyncio
+import aiohttp
+from aiohttp.resolver import ThreadedResolver
 import ccxt.async_support as ccxt
 import pandas as pd
 import requests
@@ -11,7 +13,9 @@ class AsyncExchangeClient:
     """
     CCXT Asenkron Borsa İstemcisi:
     - Piyasa mum verisi (OHLCV) için kesintisiz canlı borsa istemcisi
-    - İşlemler ve bakiye sorgulama için Testnet/Canlı borsa istemcisi
+    - İşlemler ve bakiye sorgulama için Demo Trading / Canlı borsa istemcisi
+    - ThreadedResolver ile DNS çözümleme (aiodns sorunlarını bypass eder)
+    - Binance Demo Trading (enable_demo_trading) desteği
     """
 
     def __init__(self):
@@ -22,40 +26,56 @@ class AsyncExchangeClient:
         self.is_futures = settings.IS_FUTURES
         self.exchange: Optional[ccxt.Exchange] = None
         self.public_exchange: Optional[ccxt.Exchange] = None
+        self._session: Optional[aiohttp.ClientSession] = None
 
     async def initialize(self) -> None:
         """
         Borsa bağlantılarını başlatır ve yapılandırır.
+        Demo Trading modu (TEST_MODE=True) veya Canlı Hesap modunu kullanır.
         """
         try:
             exchange_class = getattr(ccxt, self.exchange_id, None) or ccxt.binanceusdm
 
+            # ThreadedResolver ile DNS çözümleme (aiodns bypass)
+            connector = aiohttp.TCPConnector(resolver=ThreadedResolver())
+            self._session = aiohttp.ClientSession(connector=connector)
+
             # 1. Canlı Piyasa Verileri İstemcisi (OHLCV Kesintisiz Çekim İçin)
             self.public_exchange = ccxt.binance({
-                "enableRateLimit": True
+                "enableRateLimit": True,
+                "session": self._session
             })
 
-            # 2. İşlem ve Bakiye İstemcisi (Testnet veya Canlı)
+            # 2. İşlem ve Bakiye İstemcisi (Demo Trading veya Canlı)
             options = {
                 "apiKey": self.api_key,
                 "secret": self.secret_key,
                 "enableRateLimit": True,
+                "session": self._session,
                 "options": {"defaultType": "future"} if self.is_futures else {}
             }
             self.exchange = exchange_class(options)
 
             if self.test_mode:
-                try:
-                    self.exchange.set_sandbox_mode(True)
-                except Exception as sb_err:
-                    logger.warning(f"Sandbox modu uyarısı: {str(sb_err)}")
-                logger.info("[BİLGİ] 🧪 SANAL PARA (Binance Futures Testnet) Modu Aktif")
+                # Binance Demo Trading API (eski sandbox yerine)
+                if hasattr(self.exchange, 'enable_demo_trading'):
+                    self.exchange.enable_demo_trading(True)
+                    logger.info("[BILGI] DEMO TRADING Modu Aktif (Sanal Para / Gercek Altyapi)")
+                else:
+                    logger.warning("CCXT versiyonunda enable_demo_trading destegi yok, sandbox deneniyor...")
+                    try:
+                        self.exchange.set_sandbox_mode(True)
+                    except Exception:
+                        pass
+                    logger.info("[BILGI] Sandbox/Testnet Modu Aktif")
             else:
-                logger.warning("⚠️ GERÇEK HESAP MODU")
+                logger.warning("GERCEK HESAP MODU - Dikkatli olun!")
 
-            logger.info("Borsa istemcisi başarıyla ilklendirildi.")
+            # Demo Trading exchange icin piyasa yukle
+            await self.exchange.load_markets()
+            logger.info(f"Borsa istemcisi basariyla ilklendirildi. Piyasa sayisi: {len(self.exchange.markets)}")
         except Exception as e:
-            logger.error(f"Borsa başlatma hatası: {str(e)}")
+            logger.error(f"Borsa baslatma hatasi: {str(e)}")
 
     async def close(self) -> None:
         """
@@ -65,7 +85,9 @@ class AsyncExchangeClient:
             await self.exchange.close()
         if self.public_exchange:
             await self.public_exchange.close()
-        logger.info("Borsa bağlantısı kapatıldı.")
+        if self._session and not self._session.closed:
+            await self._session.close()
+        logger.info("Borsa baglantisi kapatildi.")
 
     async def fetch_ohlcv(
         self,
@@ -83,20 +105,15 @@ class AsyncExchangeClient:
         if not self.public_exchange:
             await self.initialize()
 
-        # 1. Öncelikli Yöntem: CCXT üzerinden dene
+        # 1. Oncelikli Yontem: CCXT uzerinden dene
         try:
             ohlcv = await self.public_exchange.fetch_ohlcv(symbol, timeframe, limit=limit)
             if ohlcv and len(ohlcv) > 0:
-                df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
-                df['datetime'] = pd.to_datetime(df['timestamp'], unit='ms')
-                df.set_index('datetime', inplace=True)
-                for col in ['open', 'high', 'low', 'close', 'volume']:
-                    df[col] = df[col].astype(float)
-                return df
+                return self._ohlcv_to_dataframe(ohlcv)
         except Exception:
             pass
 
-        # 2. Yedek Kesintisiz Yöntem: Binance Data API Aynası (Kesintisiz)
+        # 2. Yedek Kesintisiz Yontem: Binance Data API Aynasi
         try:
             formatted_symbol = symbol.replace("/", "").upper()
             url = "https://data-api.binance.vision/api/v3/klines"
@@ -105,22 +122,29 @@ class AsyncExchangeClient:
                 "interval": timeframe,
                 "limit": limit
             }
-            res = requests.get(url, params=params, timeout=5).json()
+            res = requests.get(url, params=params, timeout=10).json()
             if isinstance(res, list) and len(res) > 0:
-                df = pd.DataFrame(res, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume', 'close_time', 'qav', 'num_trades', 'tbv', 'tqv', 'ignore'])
-                df['datetime'] = pd.to_datetime(df['timestamp'], unit='ms')
-                df.set_index('datetime', inplace=True)
-                for col in ['open', 'high', 'low', 'close', 'volume']:
-                    df[col] = df[col].astype(float)
-                return df
+                ohlcv = [[c[0], float(c[1]), float(c[2]), float(c[3]), float(c[4]), float(c[5])] for c in res]
+                return self._ohlcv_to_dataframe(ohlcv)
         except Exception as e:
-            logger.error(f"Yedek OHLCV verisi çekilirken hata ({symbol}): {str(e)}")
+            logger.error(f"Yedek OHLCV verisi cekilirken hata ({symbol}): {str(e)}")
 
         return None
 
+    def _ohlcv_to_dataframe(self, ohlcv: list) -> pd.DataFrame:
+        """
+        OHLCV ham verisini Pandas DataFrame'e donusturur.
+        """
+        df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+        df['datetime'] = pd.to_datetime(df['timestamp'], unit='ms')
+        df.set_index('datetime', inplace=True)
+        for col in ['open', 'high', 'low', 'close', 'volume']:
+            df[col] = df[col].astype(float)
+        return df
+
     async def fetch_balance(self) -> float:
         """
-        Hesabın kullanılabilir USDT (veya quote cinsi) bakiyesini sorgular.
+        Hesabin kullanilabilir USDT bakiyesini sorgular.
         """
         if not self.exchange:
             await self.initialize()
@@ -132,12 +156,11 @@ class AsyncExchangeClient:
             balance = await self.exchange.fetch_balance()
             usdt_balance = balance.get('USDT', {}).get('free', 0.0)
             if float(usdt_balance) <= 0:
-                # Testnet için varsayılan simülasyon bakiyesi
                 return 10000.0
             return float(usdt_balance)
         except Exception as e:
-            logger.debug(f"Bakiye sorgulama detayı: {str(e)}")
-            return 10000.0  # Fallback varsayılan simülasyon bakiyesi
+            logger.debug(f"Bakiye sorgulama detayi: {str(e)}")
+            return 10000.0
 
     async def create_order(
         self,
@@ -149,7 +172,8 @@ class AsyncExchangeClient:
         params: Optional[Dict[str, Any]] = None
     ) -> Optional[Dict[str, Any]]:
         """
-        Borsada piyasa veya limit emir oluşturur.
+        Borsada piyasa veya limit emir olusturur.
+        Demo Trading modunda Binance Demo API'sine gercek emir gonderir (sanal para ile).
         """
         if not self.exchange:
             await self.initialize()
@@ -157,7 +181,7 @@ class AsyncExchangeClient:
         params = params or {}
         try:
             if not self.api_key:
-                logger.info(f"[SİMÜLASYON EMİR] {side.upper()} {amount} {symbol} @ {price or 'MARKET'}")
+                logger.info(f"[SIMULASYON EMIR] {side.upper()} {amount} {symbol} @ {price or 'MARKET'}")
                 return {
                     "id": "simulated_order_123",
                     "symbol": symbol,
@@ -175,16 +199,8 @@ class AsyncExchangeClient:
                 price=price,
                 params=params
             )
-            logger.info(f"Emir başarıyla oluşturuldu: ID={order.get('id')}, Side={side}, Amount={amount}")
+            logger.info(f"Emir basariyla olusturuldu: ID={order.get('id')}, Side={side}, Amount={amount}")
             return order
         except Exception as e:
-            logger.error(f"Emir oluşturma hatası ({side} {amount} {symbol}): {str(e)}")
-            # Testnet emri simülasyon fallback
-            return {
-                "id": f"testnet_fallback_{side}_1",
-                "symbol": symbol,
-                "side": side,
-                "amount": amount,
-                "price": price,
-                "status": "closed"
-            }
+            logger.error(f"Emir olusturma hatasi ({side} {amount} {symbol}): {str(e)}")
+            return None
