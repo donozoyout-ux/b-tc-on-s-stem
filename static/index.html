@@ -226,8 +226,32 @@
 </div>
 </div>
 </div>
-<!-- Right: Terminal Logs (8 cols on lg grid) -->
-<div class="lg:col-span-8 bg-[#030712] border border-outline-variant rounded-lg p-4 flex flex-col gap-2 h-96 relative overflow-hidden group">
+<!-- Right: Terminal Logs & AI Insights (8 cols on lg grid) -->
+<div class="lg:col-span-8 flex flex-col gap-gutter">
+<!-- AI Intelligence Card -->
+<div class="bg-surface-container border border-primary/30 rounded-lg p-4 flex flex-col gap-2 relative overflow-hidden bg-gradient-to-r from-surface-container to-surface-container-high">
+<div class="flex justify-between items-center border-b border-outline-variant pb-2">
+<span class="font-label-caps text-label-caps text-primary flex items-center gap-2 font-bold">
+<span class="material-symbols-outlined text-[18px]">psychology</span>
+                    AI DECISION ENGINE & MARKET REGIME
+                </span>
+<span class="bg-primary/20 border border-primary/40 text-primary px-3 py-1 rounded-full font-label-caps text-label-caps flex items-center gap-1 font-bold" id="ai-regime-badge">
+<div class="w-2 h-2 rounded-full bg-primary pulse-dot"></div>
+                    BOĞA TRENDİ (%88.5 AI GÜVEN)
+                </span>
+</div>
+<div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 mt-1">
+<p class="text-on-surface text-sm font-data-md" id="ai-reason-text">
+                    🤖 <span class="font-bold text-primary">AI Analizi:</span> 38 EMA / 62 EMA Boğa Dizilimi Aktif | Stoch RSI Momentum Teyit Edildi.
+                </p>
+<div class="flex items-center gap-2 bg-surface-dim px-3 py-1.5 rounded border border-outline-variant">
+<span class="text-xs text-on-surface-variant font-label-caps">AI GÜVEN:</span>
+<span class="text-primary font-bold font-data-md" id="ai-confidence-val">%88.5</span>
+</div>
+</div>
+</div>
+<!-- Terminal Logs -->
+<div class="bg-[#030712] border border-outline-variant rounded-lg p-4 flex flex-col gap-2 h-72 relative overflow-hidden group">
 <div class="absolute top-0 left-0 w-full h-full pointer-events-none bg-gradient-to-b from-transparent to-[#030712] opacity-20"></div>
 <div class="flex justify-between items-center border-b border-[#3c4a42] pb-2 mb-2">
 <h2 class="font-label-caps text-label-caps text-on-surface-variant flex items-center gap-2">
@@ -239,7 +263,8 @@
                     </span>
 </div>
 <div class="flex-1 overflow-y-auto terminal-scroll font-data-sm text-data-sm space-y-1" id="terminal-output">
-<div class="text-on-surface-variant"><span class="text-surface-variant">System</span> <span class="text-primary">[INFO]</span> Kripton Engine Dashboard Ready.</div>
+<div class="text-on-surface-variant"><span class="text-surface-variant">System</span> <span class="text-primary">[INFO]</span> Kripton AI Engine Dashboard Ready.</div>
+</div>
 </div>
 </div>
 </section>
@@ -443,6 +468,26 @@
                 } else {
                     alignEl.innerText = "NÖTR";
                     alignEl.className = "font-label-caps text-label-caps text-on-surface-variant";
+                }
+
+                // AI Decision Engine Updates
+                const aiRegime = data.ai_regime || 'RANGING_CONSOLIDATION';
+                const aiConfidence = (data.ai_confidence || 85.0).toFixed(1);
+                const aiReason = data.ai_reason || 'EMA Ribbon & Momentum Teyit Edildi.';
+
+                document.getElementById('ai-confidence-val').innerText = `%${aiConfidence}`;
+                document.getElementById('ai-reason-text').innerHTML = `🤖 <span class="font-bold text-primary">AI Analizi:</span> ${aiReason}`;
+
+                const aiBadge = document.getElementById('ai-regime-badge');
+                if (aiRegime.includes('BULL')) {
+                    aiBadge.innerHTML = `<div class="w-2 h-2 rounded-full bg-primary pulse-dot"></div> BOĞA TRENDİ (%${aiConfidence} AI GÜVEN)`;
+                    aiBadge.className = "bg-primary/20 border border-primary/40 text-primary px-3 py-1 rounded-full font-label-caps text-label-caps flex items-center gap-1 font-bold";
+                } else if (aiRegime.includes('BEAR')) {
+                    aiBadge.innerHTML = `<div class="w-2 h-2 rounded-full bg-error pulse-dot"></div> AYI TRENDİ (%${aiConfidence} AI GÜVEN)`;
+                    aiBadge.className = "bg-error-container/20 border border-error/40 text-error px-3 py-1 rounded-full font-label-caps text-label-caps flex items-center gap-1 font-bold";
+                } else {
+                    aiBadge.innerHTML = `<div class="w-2 h-2 rounded-full bg-tertiary"></div> YATAY PİYASA (%${aiConfidence} AI GÜVEN)`;
+                    aiBadge.className = "bg-tertiary-container/20 border border-tertiary/40 text-tertiary px-3 py-1 rounded-full font-label-caps text-label-caps flex items-center gap-1 font-bold";
                 }
 
             } catch (e) {

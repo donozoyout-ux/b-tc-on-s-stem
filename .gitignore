@@ -10,3 +10,4 @@ ENV/
 .pytest_cache/
 .vscode/
 .idea/
+data/trading_state.json
