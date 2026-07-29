@@ -1,8 +1,10 @@
 fastapi>=0.100.0
-uvicorn>=0.22.0
+uvicorn[standard]>=0.22.0
 ccxt>=4.0.0
-pandas>=2.0.0,<3.0.0
-numpy<2.0.0
-pandas-ta @ git+https://github.com/twopirllc/pandas-ta.git
+pandas>=2.0.0
+numpy>=1.26.0
+pandas-ta
 python-dotenv>=1.0.0
 requests>=2.31.0
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
