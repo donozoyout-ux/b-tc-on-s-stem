@@ -1,7 +1,10 @@
 import asyncio
 from contextlib import asynccontextmanager
+from typing import Optional
 from fastapi import FastAPI, HTTPException, BackgroundTasks
-from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, JSONResponse
+from pydantic import BaseModel, Field
 
 from config import settings
 from core.bot import TradingBot
@@ -14,6 +17,13 @@ optimizer = AdaptiveOptimizer(bot_instance=bot)
 background_tasks_set = set()
 
 
+class SettingsUpdateModel(BaseModel):
+    symbol: Optional[str] = Field(None, description="Parite (örn: BTC/USDT)")
+    timeframe: Optional[str] = Field(None, description="Zaman dilimi (örn: 15m)")
+    risk_percentage: Optional[float] = Field(None, description="İşlem başına risk (örn: 0.015)")
+    max_leverage: Optional[int] = Field(None, description="Maksimum kaldıraç")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -21,7 +31,7 @@ async def lifespan(app: FastAPI):
     Sunucu başlatıldığında trading motorunu ve adaptif optimizasyonu arka planda başlatır.
     Kapanışta bağlantıları güvenli bir şekilde kapatır.
     """
-    logger.info("🚀 FastAPI Sunucusu Başlatılıyor... 7/24 Trading ve Health-Check Modu Aktif.")
+    logger.info("🚀 FastAPI Sunucusu Başlatılıyor... 7/24 Trading, Dashboard ve Health-Check Modu Aktif.")
 
     # 1. Trading motorunu arka plan asyncio task olarak başlat
     bot_task = asyncio.create_task(bot.run_loop())
@@ -47,32 +57,27 @@ async def lifespan(app: FastAPI):
 # FastAPI Uygulama Tanımı
 app = FastAPI(
     title=settings.APP_NAME,
-    description="7/24 Kesintisiz Uyanık Kalan, Adaptif Kripto Algoritmik Ticaret Botu (FastAPI + CCXT + Pandas-TA)",
+    description="7/24 Kesintisiz Uyanık Kalan, Web Dashboard Destekli Adaptif Kripto Algoritmik Ticaret Botu",
     version="1.0.0",
     lifespan=lifespan
 )
+
+# Statik Dosyaları Bağlama
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 @app.get("/")
 async def root():
     """
-    Ana endpoint: Servis bilgisi ve hızlı durum sunar.
+    Ana endpoint: Web Dashboard arayüzünü (static/index.html) döndürür.
     """
-    return {
-        "app": settings.APP_NAME,
-        "status": "running",
-        "symbol": settings.SYMBOL,
-        "timeframe": settings.TIMEFRAME,
-        "health_check_url": "/health",
-        "docs_url": "/docs"
-    }
+    return FileResponse("static/index.html")
 
 
 @app.get("/health")
 async def health_check():
     """
     UptimeRobot, Render ve Koyeb servislerinin 7/24 servisi uyanık tutması için çağırdığı Health Endpoint'i.
-    HTTP 200 OK dönerek uygulamanın aktif ve uyanık kalmasını sağlar.
     """
     status_data = bot.get_status()
     return JSONResponse(
@@ -85,19 +90,75 @@ async def health_check():
     )
 
 
-@app.get("/status")
-async def get_bot_status():
+# --- REST API ENDPOINT'LERİ (DASHBOARD VE DİŞ İSTEMCİLER İÇİN) ---
+
+@app.get("/api/status")
+async def api_status():
     """
-    Botun anlık durumunu, aktif pozisyonunu ve istatistiklerini veren detaylı endpoint.
+    Dashboard için botun anlık durumu, bakiyesi, son fiyatı, aktif parametreleri ve indikatör değerlerini döner.
     """
-    return bot.get_status()
+    return bot.get_api_status()
+
+
+@app.get("/api/trades")
+async def api_trades():
+    """
+    Botun ürettiği son 20 sinyal/işlem geçmişini ve canlı terminal loglarını döner.
+    """
+    return {
+        "trades": bot.trade_history[:20],
+        "logs": bot.logs
+    }
+
+
+@app.post("/api/bot/start")
+async def start_bot():
+    """
+    Arka plandaki bot döngüsünü başlatır.
+    """
+    if not bot.is_running:
+        bot_task = asyncio.create_task(bot.run_loop())
+        background_tasks_set.add(bot_task)
+        bot_task.add_done_callback(background_tasks_set.discard)
+        bot.add_log("INFO", "Bot manuel olarak başlatıldı.")
+        return {"status": "success", "message": "Bot başlatıldı."}
+    return {"status": "already_running", "message": "Bot zaten çalışıyor."}
+
+
+@app.post("/api/bot/stop")
+async def stop_bot():
+    """
+    Arka plandaki bot döngüsünü durdurur.
+    """
+    if bot.is_running:
+        await bot.stop()
+        bot.add_log("WARN", "Bot manuel olarak durduruldu.")
+        return {"status": "success", "message": "Bot durduruldu."}
+    return {"status": "already_stopped", "message": "Bot zaten durmuş durumda."}
+
+
+@app.post("/api/settings")
+async def update_settings(payload: SettingsUpdateModel):
+    """
+    Risk, kaldıraç, parite ve timeframe parametrelerini canlı olarak günceller.
+    """
+    updated = bot.update_settings(
+        symbol=payload.symbol,
+        timeframe=payload.timeframe,
+        risk_percentage=payload.risk_percentage,
+        max_leverage=payload.max_leverage
+    )
+    return {
+        "status": "success",
+        "message": "Ayarlar başarıyla güncellendi.",
+        "settings": updated
+    }
 
 
 @app.post("/optimize")
 async def trigger_manual_optimization(background_tasks: BackgroundTasks):
     """
     Manuel olarak adaptif optimizasyonu tetikleyen endpoint.
-    Geçmiş mum verilerinde en yüksek Sharpe oranına sahip parametreleri bulur.
     """
     background_tasks.add_task(optimizer.optimize)
     return {

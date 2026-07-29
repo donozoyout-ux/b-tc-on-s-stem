@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>KRIPTON ALGO-TRADER - Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary-fixed-dim": "#4edea3",
+                        "on-primary-container": "#00422b",
+                        "surface-container-high": "#23293c",
+                        "on-error": "#690005",
+                        "error": "#ffb4ab",
+                        "on-secondary": "#67001b",
+                        "tertiary-fixed-dim": "#f9bd22",
+                        "outline-variant": "#3c4a42",
+                        "surface": "#0c1324",
+                        "secondary-fixed-dim": "#ffb2b7",
+                        "surface-dim": "#0c1324",
+                        "on-tertiary-container": "#4a3500",
+                        "outline": "#86948a",
+                        "surface-variant": "#2e3447",
+                        "primary-container": "#10b981",
+                        "surface-tint": "#4edea3",
+                        "on-tertiary": "#402d00",
+                        "inverse-surface": "#dce1fb",
+                        "tertiary-container": "#ce9a00",
+                        "on-secondary-fixed": "#40000d",
+                        "inverse-primary": "#006c49",
+                        "background": "#0c1324",
+                        "on-primary-fixed": "#002113",
+                        "on-surface-variant": "#bbcabf",
+                        "on-secondary-fixed-variant": "#92002a",
+                        "surface-container-low": "#151b2d",
+                        "surface-container": "#191f31",
+                        "surface-bright": "#33394c",
+                        "surface-container-lowest": "#070d1f",
+                        "surface-container-highest": "#2e3447",
+                        "on-surface": "#dce1fb",
+                        "tertiary-fixed": "#ffdf9f",
+                        "on-error-container": "#ffdad6",
+                        "tertiary": "#f9bd22",
+                        "on-primary": "#003824",
+                        "secondary": "#ffb2b7",
+                        "secondary-fixed": "#ffdadb",
+                        "on-primary-fixed-variant": "#005236",
+                        "on-tertiary-fixed": "#261a00",
+                        "on-background": "#dce1fb",
+                        "error-container": "#93000a",
+                        "on-tertiary-fixed-variant": "#5c4300",
+                        "secondary-container": "#b50036",
+                        "primary": "#4edea3",
+                        "primary-fixed": "#6ffbbe",
+                        "on-secondary-container": "#ffc2c4",
+                        "inverse-on-surface": "#2a3043"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "stack-lg": "2rem",
+                        "gutter": "1rem",
+                        "stack-sm": "0.5rem",
+                        "stack-md": "1rem",
+                        "margin-edge": "1.5rem",
+                        "container-max": "1440px"
+                    },
+                    "fontFamily": {
+                        "body-md": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "data-md": ["JetBrains Mono"],
+                        "data-sm": ["JetBrains Mono"],
+                        "headline-lg": ["Inter"],
+                        "headline-sm": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "data-lg": ["JetBrains Mono"],
+                        "label-caps": ["JetBrains Mono"]
+                    },
+                    "fontSize": {
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "data-md": ["14px", { "lineHeight": "20px", "fontWeight": "500" }],
+                        "data-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+                        "headline-sm": ["20px", { "lineHeight": "28px", "fontWeight": "500" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "data-lg": ["16px", { "lineHeight": "24px", "fontWeight": "500" }],
+                        "label-caps": ["11px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body {
+            background-color: #0c1324;
+            color: #dce1fb;
+        }
+        .glow-active {
+            box-shadow: 0 0 15px rgba(78, 222, 163, 0.3);
+        }
+        .pulse-dot {
+            animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+        }
+        @keyframes pulse-ring {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(78, 222, 163, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(78, 222, 163, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(78, 222, 163, 0); }
+        }
+        .terminal-scroll::-webkit-scrollbar {
+            width: 4px;
+        }
+        .terminal-scroll::-webkit-scrollbar-track {
+            background: #151b2d;
+        }
+        .terminal-scroll::-webkit-scrollbar-thumb {
+            background: #3c4a42;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen flex flex-col font-body-md overflow-x-hidden">
+<!-- Top Navigation -->
+<nav class="bg-surface-container-high dark:bg-surface-container-high border-b border-outline-variant flex justify-between items-center px-margin-edge w-full h-16 z-50 sticky top-0">
+<div class="flex items-center gap-6">
+<!-- Brand Logo -->
+<div class="font-headline-md text-headline-md font-bold text-primary drop-shadow-[0_0_10px_rgba(78,222,163,0.3)] flex items-center gap-2">
+<span class="material-symbols-outlined pulse-dot text-primary">memory</span>
+                KRIPTON ALGO-TRADER
+            </div>
+<!-- Badges -->
+<div class="hidden md:flex items-center gap-3 ml-4">
+<span class="bg-tertiary-container/20 border border-tertiary/30 text-tertiary px-2 py-1 rounded font-label-caps text-label-caps flex items-center gap-1" id="mode-badge">
+<span class="material-symbols-outlined text-[14px]">science</span>
+                    SANAL PARA (TESTNET)
+                </span>
+<span class="bg-primary-container/20 border border-primary/30 text-primary px-2 py-1 rounded font-label-caps text-label-caps flex items-center gap-1 transition-colors" id="status-badge">
+<div class="w-2 h-2 rounded-full bg-primary pulse-dot"></div>
+                    BOT AKTİF
+                </span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<!-- Navigation Links -->
+<div class="hidden md:flex items-center gap-gutter">
+<a class="text-primary border-b-2 border-primary pb-1 font-bold font-label-caps text-label-caps hover:text-primary-fixed-dim transition-colors duration-200" href="#">DASHBOARD</a>
+<a class="text-on-surface-variant font-label-caps text-label-caps hover:text-primary-fixed-dim transition-colors duration-200" href="#" onclick="toggleSettingsModal()">SETTINGS</a>
+</div>
+<!-- Actions -->
+<div class="flex items-center gap-3 border-l border-outline-variant pl-4 ml-2">
+<button class="bg-primary text-on-primary-container font-label-caps text-label-caps px-4 py-2 rounded font-bold hover:bg-primary-fixed transition-colors flex items-center gap-2 glow-active" id="toggle-bot-btn">
+<span class="material-symbols-outlined text-[16px]">stop</span>
+                    Botu Durdur
+                </button>
+<button class="text-on-surface-variant hover:text-primary transition-colors p-2 rounded hover:bg-surface-variant" onclick="toggleSettingsModal()">
+<span class="material-symbols-outlined">settings</span>
+</button>
+</div>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="flex-1 max-w-container-max mx-auto w-full p-gutter md:p-margin-edge flex flex-col gap-stack-lg">
+<!-- KPI Grid -->
+<section class="grid grid-cols-2 md:grid-cols-4 gap-gutter">
+<div class="bg-surface-container border border-outline-variant rounded-lg p-4 flex flex-col gap-2">
+<span class="text-on-surface-variant font-label-caps text-label-caps uppercase">Toplam Bakiye (USDT)</span>
+<span class="font-data-lg text-data-lg text-on-surface text-2xl font-bold" id="kpi-balance">$0.00</span>
+</div>
+<div class="bg-surface-container border border-outline-variant rounded-lg p-4 flex flex-col gap-2">
+<span class="text-on-surface-variant font-label-caps text-label-caps uppercase">Aktif Parite</span>
+<span class="font-data-lg text-data-lg text-on-surface text-2xl font-bold" id="kpi-symbol">BTC/USDT <span class="text-on-surface-variant text-sm ml-1" id="kpi-timeframe">(15m)</span></span>
+</div>
+<div class="bg-surface-container border border-outline-variant rounded-lg p-4 flex flex-col gap-2">
+<span class="text-on-surface-variant font-label-caps text-label-caps uppercase">SuperTrend Multiplier</span>
+<span class="font-data-lg text-data-lg text-on-surface text-2xl font-bold" id="kpi-supertrend">1.6x</span>
+</div>
+<div class="bg-surface-container border border-outline-variant rounded-lg p-4 flex flex-col gap-2">
+<span class="text-on-surface-variant font-label-caps text-label-caps uppercase">Son Sinyal</span>
+<div class="flex items-center gap-2" id="kpi-signal-container">
+<span class="font-data-lg text-data-lg text-on-surface-variant text-2xl font-bold" id="kpi-signal">NÖTR</span>
+</div>
+</div>
+</section>
+<!-- 2 Column Layout -->
+<section class="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
+<!-- Left: Market Status (4 cols on lg grid) -->
+<div class="lg:col-span-4 bg-surface-container border border-outline-variant rounded-lg p-4 flex flex-col gap-stack-md">
+<h2 class="font-headline-sm text-headline-sm border-b border-outline-variant pb-2">Market Status</h2>
+<div class="flex justify-between items-end">
+<div class="flex flex-col">
+<span class="text-on-surface-variant font-label-caps text-label-caps">CURRENT PRICE</span>
+<span class="font-data-lg text-data-lg text-2xl font-bold text-primary glow-active" id="current-price">$0.00</span>
+</div>
+<div class="flex flex-col text-right">
+<span class="text-on-surface-variant font-label-caps text-label-caps">ATR</span>
+<span class="font-data-md text-data-md" id="atr-val">0.00</span>
+</div>
+</div>
+<div class="space-y-4 mt-2">
+<div>
+<div class="flex justify-between mb-1">
+<span class="font-label-caps text-label-caps text-on-surface-variant">EMA 38/62/200 Alignment</span>
+<span class="font-label-caps text-label-caps text-primary" id="ema-align-status">BEKLEMEDE</span>
+</div>
+<div class="w-full bg-surface-container-low rounded-full h-1.5">
+<div class="bg-primary h-1.5 rounded-full" id="ema-progress" style="width: 50%"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between mb-1">
+<span class="font-label-caps text-label-caps text-on-surface-variant">Stochastic RSI</span>
+<span class="font-label-caps text-label-caps text-tertiary" id="stoch-rsi-status">K: 0 / D: 0</span>
+</div>
+<div class="w-full bg-surface-container-low rounded-full h-1.5">
+<div class="bg-tertiary h-1.5 rounded-full" id="stoch-progress" style="width: 0%"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Right: Terminal Logs (8 cols on lg grid) -->
+<div class="lg:col-span-8 bg-[#030712] border border-outline-variant rounded-lg p-4 flex flex-col gap-2 h-96 relative overflow-hidden group">
+<div class="absolute top-0 left-0 w-full h-full pointer-events-none bg-gradient-to-b from-transparent to-[#030712] opacity-20"></div>
+<div class="flex justify-between items-center border-b border-[#3c4a42] pb-2 mb-2">
+<h2 class="font-label-caps text-label-caps text-on-surface-variant flex items-center gap-2">
+<span class="material-symbols-outlined text-[14px]">terminal</span>
+                        BOT EXECUTION LOGS
+                    </h2>
+<span class="flex items-center gap-1 font-data-sm text-data-sm text-on-surface-variant">
+<div class="w-2 h-2 rounded-full bg-primary pulse-dot"></div> Live Connection
+                    </span>
+</div>
+<div class="flex-1 overflow-y-auto terminal-scroll font-data-sm text-data-sm space-y-1" id="terminal-output">
+<div class="text-on-surface-variant"><span class="text-surface-variant">System</span> <span class="text-primary">[INFO]</span> Kripton Engine Dashboard Ready.</div>
+</div>
+</div>
+</section>
+<!-- Bottom: Trade History -->
+<section class="bg-surface-container border border-outline-variant rounded-lg overflow-hidden flex flex-col">
+<div class="p-4 border-b border-outline-variant flex justify-between items-center">
+<h2 class="font-headline-sm text-headline-sm">Trade History</h2>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="border-b border-surface-variant bg-surface-container-low">
+<th class="p-3 font-label-caps text-label-caps text-on-surface-variant">Tarih/Saat</th>
+<th class="p-3 font-label-caps text-label-caps text-on-surface-variant">Parite</th>
+<th class="p-3 font-label-caps text-label-caps text-on-surface-variant">Yön</th>
+<th class="p-3 font-label-caps text-label-caps text-on-surface-variant">Giriş Fiyatı</th>
+<th class="p-3 font-label-caps text-label-caps text-on-surface-variant text-right">Miktar</th>
+<th class="p-3 font-label-caps text-label-caps text-on-surface-variant text-right">Stop Loss</th>
+<th class="p-3 font-label-caps text-label-caps text-on-surface-variant text-right">Take Profit</th>
+<th class="p-3 font-label-caps text-label-caps text-on-surface-variant text-center">Durum</th>
+</tr>
+</thead>
+<tbody class="font-data-md text-data-md" id="trade-history-body">
+<tr class="border-b border-surface-variant">
+<td class="p-3 text-on-surface-variant text-center" colspan="8">Henüz tamamlanan işlem bulunmuyor.</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+</main>
+<!-- Settings Modal (Slide-over) -->
+<div class="fixed inset-0 z-[100] hidden" id="settings-modal">
+<div class="absolute inset-0 bg-background/80 backdrop-blur-sm" onclick="toggleSettingsModal()"></div>
+<div class="absolute right-0 top-0 h-full w-full max-w-md bg-surface-container-high border-l border-outline-variant shadow-2xl flex flex-col transform translate-x-full transition-transform duration-300 ease-in-out" id="settings-panel">
+<div class="p-6 border-b border-outline-variant flex justify-between items-center bg-surface-container-lowest">
+<h2 class="font-headline-sm text-headline-sm flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">tune</span>
+                    Algorithm Settings
+                </h2>
+<button class="text-on-surface-variant hover:text-error transition-colors" onclick="toggleSettingsModal()">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+<div class="p-6 flex-1 overflow-y-auto flex flex-col gap-6">
+<div class="space-y-2">
+<label class="font-label-caps text-label-caps text-on-surface-variant">Trading Symbol</label>
+<select class="w-full bg-surface-dim border border-outline-variant rounded p-2 text-on-surface font-data-md focus:border-primary focus:ring-1 focus:ring-primary outline-none" id="input-symbol">
+<option value="BTC/USDT">BTC/USDT</option>
+<option value="ETH/USDT">ETH/USDT</option>
+<option value="SOL/USDT">SOL/USDT</option>
+</select>
+</div>
+<div class="space-y-2">
+<label class="font-label-caps text-label-caps text-on-surface-variant">Timeframe</label>
+<select class="w-full bg-surface-dim border border-outline-variant rounded p-2 text-on-surface font-data-md focus:border-primary focus:ring-1 focus:ring-primary outline-none" id="input-timeframe">
+<option value="5m">5m</option>
+<option selected value="15m">15m</option>
+<option value="1h">1h</option>
+<option value="4h">4h</option>
+</select>
+</div>
+<div class="space-y-2">
+<label class="font-label-caps text-label-caps text-on-surface-variant flex justify-between">
+<span>Risk Per Trade (%)</span>
+<span class="text-primary" id="risk-val">1.5%</span>
+</label>
+<input class="w-full accent-primary" id="input-risk" max="5" min="0.5" oninput="document.getElementById('risk-val').innerText = this.value + '%'" step="0.5" type="range" value="1.5"/>
+</div>
+<div class="space-y-2">
+<label class="font-label-caps text-label-caps text-on-surface-variant">Leverage</label>
+<input class="w-full bg-surface-dim border border-outline-variant rounded p-2 text-on-surface font-data-md focus:border-primary focus:ring-1 focus:ring-primary outline-none" id="input-leverage" min="1" max="20" type="number" value="5"/>
+</div>
+</div>
+<div class="p-6 border-t border-outline-variant bg-surface-container-lowest flex gap-4">
+<button class="flex-1 border border-outline-variant text-on-surface hover:bg-surface-variant py-2 rounded font-label-caps font-bold transition-colors" onclick="toggleSettingsModal()">CANCEL</button>
+<button class="flex-1 bg-primary text-on-primary-container hover:bg-primary-fixed py-2 rounded font-label-caps font-bold transition-colors shadow-[0_0_10px_rgba(78,222,163,0.2)]" onclick="saveSettings()">SAVE CONFIG</button>
+</div>
+</div>
+</div>
+
+<script>
+        let botActive = true;
+        const toggleBtn = document.getElementById('toggle-bot-btn');
+        const statusBadge = document.getElementById('status-badge');
+        const terminal = document.getElementById('terminal-output');
+
+        function updateBotUIState(isOnline) {
+            botActive = isOnline;
+            if (botActive) {
+                toggleBtn.innerHTML = `<span class="material-symbols-outlined text-[16px]">stop</span> Botu Durdur`;
+                toggleBtn.className = "bg-primary text-on-primary-container font-label-caps text-label-caps px-4 py-2 rounded font-bold hover:bg-primary-fixed transition-colors flex items-center gap-2 glow-active";
+                statusBadge.innerHTML = `<div class="w-2 h-2 rounded-full bg-primary pulse-dot"></div> BOT AKTİF`;
+                statusBadge.className = "bg-primary-container/20 border border-primary/30 text-primary px-2 py-1 rounded font-label-caps text-label-caps flex items-center gap-1 transition-colors";
+            } else {
+                toggleBtn.innerHTML = `<span class="material-symbols-outlined text-[16px]">play_arrow</span> Botu Başlat`;
+                toggleBtn.className = "bg-surface-variant text-on-surface border border-outline-variant font-label-caps text-label-caps px-4 py-2 rounded font-bold hover:bg-surface-container-highest transition-colors flex items-center gap-2";
+                statusBadge.innerHTML = `<div class="w-2 h-2 rounded-full bg-error"></div> BOT DURDURULDU`;
+                statusBadge.className = "bg-error-container/20 border border-error/30 text-error px-2 py-1 rounded font-label-caps text-label-caps flex items-center gap-1 transition-colors";
+            }
+        }
+
+        toggleBtn.addEventListener('click', async () => {
+            try {
+                const endpoint = botActive ? '/api/bot/stop' : '/api/bot/start';
+                const res = await fetch(endpoint, { method: 'POST' });
+                if (res.ok) {
+                    updateBotUIState(!botActive);
+                    fetchStatus();
+                }
+            } catch (e) {
+                console.error("Failed to toggle bot state", e);
+            }
+        });
+
+        // Settings Modal Logic
+        const modal = document.getElementById('settings-modal');
+        const panel = document.getElementById('settings-panel');
+
+        function toggleSettingsModal() {
+            if (modal.classList.contains('hidden')) {
+                modal.classList.remove('hidden');
+                setTimeout(() => { panel.classList.remove('translate-x-full'); }, 10);
+            } else {
+                panel.classList.add('translate-x-full');
+                setTimeout(() => { modal.classList.add('hidden'); }, 300);
+            }
+        }
+
+        async function saveSettings() {
+            const symbol = document.getElementById('input-symbol').value;
+            const timeframe = document.getElementById('input-timeframe').value;
+            const risk_percentage = parseFloat(document.getElementById('input-risk').value) / 100.0;
+            const max_leverage = parseInt(document.getElementById('input-leverage').value);
+
+            try {
+                const res = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ symbol, timeframe, risk_percentage, max_leverage })
+                });
+                if (res.ok) {
+                    toggleSettingsModal();
+                    fetchStatus();
+                }
+            } catch(e) {
+                console.error("Settings update failed", e);
+            }
+        }
+
+        async function fetchStatus() {
+            try {
+                const res = await fetch('/api/status');
+                if (!res.ok) return;
+                const data = await res.json();
+
+                updateBotUIState(data.status === 'online');
+
+                document.getElementById('kpi-balance').innerText = `$${(data.balance || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                document.getElementById('kpi-symbol').innerHTML = `${data.symbol} <span class="text-on-surface-variant text-sm ml-1">(${data.timeframe})</span>`;
+                document.getElementById('kpi-supertrend').innerText = `${data.active_supertrend_multiplier || 1.6}x`;
+                document.getElementById('current-price').innerText = `$${(data.last_price || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                document.getElementById('atr-val').innerText = (data.atr || 0).toFixed(2);
+
+                const sigContainer = document.getElementById('kpi-signal-container');
+                const sig = data.last_signal || 'NEUTRAL';
+                if (sig === 'LONG' || sig === 'BUY') {
+                    sigContainer.innerHTML = `<span class="font-data-lg text-data-lg text-primary text-2xl font-bold drop-shadow-[0_0_5px_rgba(78,222,163,0.5)]">BUY</span><span class="material-symbols-outlined text-primary">trending_up</span>`;
+                } else if (sig === 'SHORT' || sig === 'SELL') {
+                    sigContainer.innerHTML = `<span class="font-data-lg text-data-lg text-error text-2xl font-bold drop-shadow-[0_0_5px_rgba(255,180,171,0.5)]">SELL</span><span class="material-symbols-outlined text-error">trending_down</span>`;
+                } else {
+                    sigContainer.innerHTML = `<span class="font-data-lg text-data-lg text-on-surface-variant text-2xl font-bold">NÖTR</span>`;
+                }
+
+                // Mode Badge
+                const modeBadge = document.getElementById('mode-badge');
+                if (data.test_mode) {
+                    modeBadge.innerHTML = `<span class="material-symbols-outlined text-[14px]">science</span> SANAL PARA (TESTNET)`;
+                    modeBadge.className = "bg-tertiary-container/20 border border-tertiary/30 text-tertiary px-2 py-1 rounded font-label-caps text-label-caps flex items-center gap-1";
+                } else {
+                    modeBadge.innerHTML = `<span class="material-symbols-outlined text-[14px]">warning</span> CANLI HESAP`;
+                    modeBadge.className = "bg-error-container/20 border border-error/30 text-error px-2 py-1 rounded font-label-caps text-label-caps flex items-center gap-1";
+                }
+
+                // Stoch RSI
+                const stochK = data.stoch_k || 0;
+                const stochD = data.stoch_d || 0;
+                document.getElementById('stoch-rsi-status').innerText = `K: ${stochK.toFixed(1)} / D: ${stochD.toFixed(1)}`;
+                document.getElementById('stoch-progress').style.width = `${Math.min(100, Math.max(0, stochK))}%`;
+
+                // EMA alignment
+                const fast = data.ema_fast || 0;
+                const slow = data.ema_slow || 0;
+                const alignEl = document.getElementById('ema-align-status');
+                if (fast > slow) {
+                    alignEl.innerText = "ALIGNED (BULLISH)";
+                    alignEl.className = "font-label-caps text-label-caps text-primary";
+                } else if (fast < slow) {
+                    alignEl.innerText = "ALIGNED (BEARISH)";
+                    alignEl.className = "font-label-caps text-label-caps text-error";
+                } else {
+                    alignEl.innerText = "NÖTR";
+                    alignEl.className = "font-label-caps text-label-caps text-on-surface-variant";
+                }
+
+            } catch (e) {
+                console.error("Status fetch error", e);
+            }
+        }
+
+        async function fetchTradesAndLogs() {
+            try {
+                const res = await fetch('/api/trades');
+                if (!res.ok) return;
+                const data = await res.json();
+
+                // Update Logs Terminal
+                if (data.logs && data.logs.length > 0) {
+                    terminal.innerHTML = '';
+                    data.logs.forEach(log => {
+                        const logEl = document.createElement('div');
+                        logEl.className = 'text-on-surface-variant';
+                        let colorClass = 'text-primary';
+                        if (log.includes('[ERROR]') || log.includes('STOP')) colorClass = 'text-error';
+                        else if (log.includes('[WARN]')) colorClass = 'text-tertiary';
+                        logEl.innerHTML = `<span class="text-surface-variant">${log.time || ''}</span> <span class="${colorClass}">[${log.level || 'INFO'}]</span> ${log.message || log}`;
+                        terminal.appendChild(logEl);
+                    });
+                    terminal.scrollTop = terminal.scrollHeight;
+                }
+
+                // Update Trade History Table
+                const tbody = document.getElementById('trade-history-body');
+                if (data.trades && data.trades.length > 0) {
+                    tbody.innerHTML = '';
+                    data.trades.forEach(t => {
+                        const tr = document.createElement('tr');
+                        tr.className = 'border-b border-surface-variant hover:bg-surface-variant/50 transition-colors';
+                        const sideClass = t.side === 'BUY' || t.side === 'LONG' ? 'text-primary' : 'text-error';
+                        const statusBadgeHtml = t.status === 'AÇIK'
+                            ? `<span class="bg-primary/20 text-primary px-2 py-0.5 rounded text-[10px] font-bold">AÇIK</span>`
+                            : `<span class="bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded text-[10px] font-bold">${t.status || 'KAPALI'}</span>`;
+
+                        tr.innerHTML = `
+                            <td class="p-3 text-on-surface-variant">${t.timestamp || ''}</td>
+                            <td class="p-3">${t.symbol || 'BTC/USDT'}</td>
+                            <td class="p-3 ${sideClass}">${t.side}</td>
+                            <td class="p-3">${(t.entry_price || 0).toLocaleString('en-US', {minimumFractionDigits:2})}</td>
+                            <td class="p-3 text-right">${t.position_size || 0}</td>
+                            <td class="p-3 text-right text-error">${(t.stop_loss || 0).toLocaleString('en-US', {minimumFractionDigits:2})}</td>
+                            <td class="p-3 text-right text-primary">${(t.take_profit || 0).toLocaleString('en-US', {minimumFractionDigits:2})}</td>
+                            <td class="p-3 text-center">${statusBadgeHtml}</td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                }
+            } catch(e) {
+                console.error("Trades & Logs fetch error", e);
+            }
+        }
+
+        // Poll every 3 seconds for status and 5 seconds for trades/logs
+        fetchStatus();
+        fetchTradesAndLogs();
+        setInterval(fetchStatus, 3000);
+        setInterval(fetchTradesAndLogs, 5000);
+    </script>
+</body>
+</html>
