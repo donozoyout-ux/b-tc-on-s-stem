@@ -45,7 +45,7 @@ class Settings(BaseSettings):
 
     # --- İşlem ve Parite Ayarları ---
     SYMBOL: str = Field(default="BTC/USDT", description="İşlem yapılacak sembol (örn: BTC/USDT)")
-    TIMEFRAME: str = Field(default="15m", description="Mum zaman dilimi (1m, 5m, 15m, 1h, 4h)")
+    TIMEFRAME: str = Field(default="5m", description="Mum zaman dilimi (1m, 5m, 15m, 1h, 4h)")
     POLL_INTERVAL_SECONDS: int = Field(default=60, description="Döngü tarama sıklığı (saniye)")
 
     # --- Strateji Parametreleri (Kripton Gezegeni Yöntemi) ---
@@ -60,11 +60,11 @@ class Settings(BaseSettings):
     STOCH_RSI_D: int = Field(default=3, description="Stoch RSI %D düzeltme")
     STOCH_RSI_RSI_LEN: int = Field(default=8, description="Stoch RSI - RSI periyodu")
     STOCH_RSI_STOCH_LEN: int = Field(default=10, description="Stoch RSI periyodu")
-    STOCH_RSI_OVERSOLD: float = Field(default=20.0, description="Aşırı satım eşiği")
-    STOCH_RSI_OVERBOUGHT: float = Field(default=80.0, description="Aşırı alım eşiği")
+    STOCH_RSI_OVERSOLD: float = Field(default=50.0, description="Pullback Long tetiklenme eşiği (Stoch_K < 50)")
+    STOCH_RSI_OVERBOUGHT: float = Field(default=50.0, description="Pullback Short tetiklenme eşiği (Stoch_K > 50)")
 
     # --- Risk ve Kasa Yönetimi ---
-    RISK_PERCENTAGE: float = Field(default=0.015, description="İşlem başına maksimum bakiye riski (0.015 = %1.5)")
+    RISK_PERCENTAGE: float = Field(default=0.02, description="İşlem başına maksimum bakiye riski (0.02 = %2.0)")
     MAX_LEVERAGE: int = Field(default=5, description="Kullanılacak kaldıraç oranı")
     ATR_PERIOD: int = Field(default=14, description="ATR periyodu")
     ATR_MULTIPLIER_SL: float = Field(default=1.5, description="ATR Stop-Loss çarpanı (1.5 * ATR)")

@@ -13,7 +13,7 @@ class RiskManager:
 
     def __init__(
         self,
-        risk_percentage: float = 0.015,
+        risk_percentage: float = 0.02,
         max_leverage: int = 5,
         atr_multiplier_sl: float = 1.5,
         atr_multiplier_tp: float = 3.0,
@@ -31,15 +31,17 @@ class RiskManager:
         self,
         account_balance: float,
         entry_price: float,
-        atr: float,
-        signal_type: str
+        atr: float = 0.0,
+        signal_type: str = "LONG",
+        sl_pct: float = 0.01,
+        tp_pct: float = 0.02
     ) -> Dict[str, Any]:
         """
-        Giriş fiyatı ve ATR verisine dayanarak Stop-Loss, Take-Profit ve Pozisyon Miktarını hesaplar.
+        Giriş fiyatı, ATR veya Sabit Yüzde (SL: %1.0, TP: %2.0) verisine dayanarak Stop-Loss, Take-Profit ve Pozisyon Miktarını hesaplar.
         Kayma (Slippage) etkisi giriş fiyatına yansıtılır.
         """
-        if account_balance <= 0 or entry_price <= 0 or atr <= 0:
-            logger.error(f"Geçersiz risk girdisi: Bakiye={account_balance}, Fiyat={entry_price}, ATR={atr}")
+        if account_balance <= 0 or entry_price <= 0:
+            logger.error(f"Geçersiz risk girdisi: Bakiye={account_balance}, Fiyat={entry_price}")
             return {"valid": False}
 
         # Kayma yansıtılmış gerçekleşme fiyatı (Slippage)
@@ -48,12 +50,16 @@ class RiskManager:
         else:
             exec_entry_price = entry_price * (1 - self.slippage_rate)
 
-        # Riske edilecek miktar (USD/USDT cinsinden - maks %2)
+        # Riske edilecek miktar (USD/USDT cinsinden - varsayılan %2)
         risk_amount = account_balance * self.risk_percentage
 
-        # Stop-Loss ve Take-Profit Seviyeleri
-        sl_distance = atr * self.atr_multiplier_sl
-        tp_distance = atr * self.atr_multiplier_tp
+        # Stop-Loss ve Take-Profit Seviyeleri (ATR varsa ATR tabanlı, yoksa Sabit Yüzde tabanlı)
+        if atr > 0 and self.atr_multiplier_sl > 0:
+            sl_distance = atr * self.atr_multiplier_sl
+            tp_distance = atr * self.atr_multiplier_tp
+        else:
+            sl_distance = exec_entry_price * sl_pct
+            tp_distance = exec_entry_price * tp_pct
 
         if signal_type == "LONG":
             stop_loss = exec_entry_price - sl_distance

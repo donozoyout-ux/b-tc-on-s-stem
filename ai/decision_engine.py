@@ -161,3 +161,136 @@ class AIDecisionEngine:
             f"<b>Analiz Özeti:</b> {market['reason']}"
         )
         return summary
+
+    def evaluate_kripton_prompt_schema(
+        self,
+        current_price: float,
+        ema_38: float,
+        ema_62: float,
+        stoch_k: float,
+        account_balance: float = 10000.00,
+        current_position: Optional[Dict[str, Any]] = None,
+        symbol: str = "BTCUSDT",
+        leverage: int = 5,
+        risk_per_trade_pct: float = 2.0,
+        taker_fee_pct: float = 0.05,
+        slippage_pct: float = 0.02
+    ) -> Dict[str, Any]:
+        """
+        KRIPTON ALGO-TRADER Otonom Strateji ve Risk Yönetim Motoru.
+        Sistem talimatı JSON şeması formatında birebir çıktı üretir.
+        """
+        # STEP 1: Açık pozisyonu değerlendir
+        if current_position is not None:
+            side = current_position.get("side", "NONE")
+            entry_price = float(current_position.get("entry_price", 0.0))
+            stop_loss = float(current_position.get("stop_loss", 0.0))
+            take_profit = float(current_position.get("take_profit", 0.0))
+            size_usdt = float(current_position.get("position_size_usdt", current_position.get("size_usdt", 0.0)))
+
+            sl_hit = (side == "LONG" and current_price <= stop_loss) or (side == "SHORT" and current_price >= stop_loss)
+            tp_hit = (side == "LONG" and current_price >= take_profit) or (side == "SHORT" and current_price <= take_profit)
+
+            if sl_hit or tp_hit:
+                reason_type = "TAKE_PROFIT" if tp_hit else "STOP_LOSS"
+                # Kayma uygulayarak çıkış fiyatı
+                exec_exit = current_price * (1 - (slippage_pct / 100)) if side == "LONG" else current_price * (1 + (slippage_pct / 100))
+                
+                # Brüt PnL
+                if side == "LONG":
+                    gross_pnl = (exec_exit - entry_price) / entry_price * size_usdt
+                else:
+                    gross_pnl = (entry_price - exec_exit) / entry_price * size_usdt
+
+                total_fees = size_usdt * (taker_fee_pct / 100) * 2  # Giriş + Çıkış komisyonu
+                net_pnl = gross_pnl - total_fees
+                new_balance = account_balance + net_pnl
+
+                return {
+                    "action": "CLOSE",
+                    "reasoning": f"Açık {side} pozisyonu {reason_type} seviyesine ulaştı. Kapatıldı @ ${exec_exit:.2f}. Net PnL: ${net_pnl:.2f}.",
+                    "trade_details": {
+                        "symbol": symbol,
+                        "side": side,
+                        "entry_price": entry_price,
+                        "stop_loss": stop_loss,
+                        "take_profit": take_profit,
+                        "position_size_usdt": size_usdt,
+                        "estimated_fee_usdt": round(total_fees, 2)
+                    },
+                    "account_state": {
+                        "balance_usdt": round(new_balance, 2),
+                        "active_position": null
+                    }
+                }
+
+        # STEP 2: Pozisyon yoksa strateji kurallarını tara
+        is_bullish_alignment = (ema_38 > ema_62)
+        is_bearish_alignment = (ema_38 < ema_62)
+        
+        # Flat / Sık kesişim kontrolü
+        ema_diff_pct = abs(ema_38 - ema_62) / current_price if current_price > 0 else 0.0
+        is_flat = (ema_diff_pct < 0.0005)
+
+        is_long_pullback = (stoch_k < 50.0)
+        is_short_pullback = (stoch_k > 50.0)
+
+        action = "WAIT"
+        side = "NONE"
+        entry_price = 0.0
+        stop_loss = 0.0
+        take_profit = 0.0
+        position_size_usdt = 0.0
+        estimated_fee_usdt = 0.0
+        reasoning = "EMA_38 ve EMA_62 yatay/nötr veya sinyal koşulları karşılanmadı."
+
+        if is_flat:
+            action = "WAIT"
+            reasoning = "EMA_38 ve EMA_62 yatay seyrediyor ve sıklıkla kesişiyor. Aksiyon: WAIT."
+        elif is_bullish_alignment and is_long_pullback:
+            action = "BUY"
+            side = "LONG"
+            entry_price = current_price * (1 + (slippage_pct / 100))
+            stop_loss = round(entry_price * 0.99, 2)    # -1.0% Stop Loss
+            take_profit = round(entry_price * 1.02, 2)  # +2.0% Take Profit
+            
+            risk_amount = account_balance * (risk_per_trade_pct / 100)
+            position_size_usdt = min(account_balance * leverage, risk_amount / 0.01)
+            estimated_fee_usdt = position_size_usdt * (taker_fee_pct / 100)
+            reasoning = f"Trend: EMA_38 (${ema_38}) > EMA_62 (${ema_62}) Boğa dizilimi. Tetikleyici: Stoch_K ({stoch_k}) < 50 pullback girişi. BUY (LONG) sinyali."
+
+        elif is_bearish_alignment and is_short_pullback:
+            action = "SELL"
+            side = "SHORT"
+            entry_price = current_price * (1 - (slippage_pct / 100))
+            stop_loss = round(entry_price * 1.01, 2)    # +1.0% Stop Loss
+            take_profit = round(entry_price * 0.98, 2)  # -2.0% Take Profit
+
+            risk_amount = account_balance * (risk_per_trade_pct / 100)
+            position_size_usdt = min(account_balance * leverage, risk_amount / 0.01)
+            estimated_fee_usdt = position_size_usdt * (taker_fee_pct / 100)
+            reasoning = f"Trend: EMA_38 (${ema_38}) < EMA_62 (${ema_62}) Ayı dizilimi. Tetikleyici: Stoch_K ({stoch_k}) > 50 pullback girişi. SELL (SHORT) sinyali."
+
+        active_position = None
+        if action in ["BUY", "SELL"]:
+            active_position = {
+                "symbol": symbol,
+                "side": side,
+                "entry_price": round(entry_price, 2),
+                "size_usdt": round(position_size_usdt, 2),
+                "stop_loss": stop_loss,
+                "take_profit": take_profit
+            }
+
+        return {
+            "action": action,
+            "reasoning": reasoning,
+            "trade_details": {
+                "symbol": symbol,
+                "side": side,
+                "entry_price": round(entry_price, 2),
+                "stop_loss": stop_loss,
+                "take_profit": take_profit,
+                "position_size_usdt": round(position_size_usdt, 2)
+            }
+        }

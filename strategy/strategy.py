@@ -30,8 +30,8 @@ class KriptonStrategy:
         stoch_d: int = 3,
         rsi_len: int = 8,
         stoch_len: int = 10,
-        stoch_oversold: float = 20.0,
-        stoch_overbought: float = 80.0
+        stoch_oversold: float = 35.0,
+        stoch_overbought: float = 65.0
     ):
         self.ema_fast = ema_fast
         self.ema_slow = ema_slow
@@ -82,31 +82,31 @@ class KriptonStrategy:
         
         atr = last.get('atr', 0.0)
 
-        # --- 1. TREND FİLTRESİ ---
-        is_bullish_trend = (fast_ema > slow_ema) and (close_price > trend_ema)
-        is_bearish_trend = (fast_ema < slow_ema) and (close_price < trend_ema)
+        # --- KRIPTON ALGO-TRADER STRATEJİ KURALLARI ---
+        # 1. Trend Dizilimi (Bullish Alignment: EMA_38 > EMA_62 / Bearish Alignment: EMA_38 < EMA_62)
+        is_bullish_alignment = (fast_ema > slow_ema)
+        is_bearish_alignment = (fast_ema < slow_ema)
 
-        # --- 2. SUPERTREND SİNYALİ ---
-        is_supertrend_bull = (st_dir == 1)
-        is_supertrend_bear = (st_dir == -1)
+        # Flat / Yatay Trend Kesişim Kontrolü
+        ema_diff_pct = abs(fast_ema - slow_ema) / close_price if close_price > 0 else 0.0
+        is_flat_or_crossing = (ema_diff_pct < 0.0005)
 
-        # --- 3. STOCH RSI KOŞULU ---
-        # Long teyit: Son 2 mumda Stoch RSI aşırı satım bölgesinden (<20) yukarı çıkış / kesişim yaptı mı?
-        stoch_long_signal = (prev_k < self.stoch_oversold or curr_k < self.stoch_oversold + 10) and (curr_k > curr_d)
-        
-        # Short teyit: Son 2 mumda Stoch RSI aşırı alım bölgesinden (>80) aşağı düşüş / kesişim yaptı mı?
-        stoch_short_signal = (prev_k > self.stoch_overbought or curr_k > self.stoch_overbought - 10) and (curr_k < curr_d)
+        # 2. Pullback Tetikleyicisi (Stoch_K < 50 for Long, Stoch_K > 50 for Short)
+        is_long_pullback = (curr_k < self.stoch_oversold)
+        is_short_pullback = (curr_k > self.stoch_overbought)
 
-        # --- 4. BİRLEŞİK İŞLEM SİNYALİ ---
+        # --- 3. BİRLEŞİK İŞLEM SİNYALİ ---
         signal = SignalType.NEUTRAL
-        reason = "Koşullar sağlanmadı"
+        reason = "EMA38/EMA62 yatay veya sinyal bulunamadı, bekleniyor (WAIT)."
 
-        if is_bullish_trend and is_supertrend_bull and stoch_long_signal:
+        if is_flat_or_crossing:
+            reason = "EMA38 ve EMA62 yatay/sık kesişiyor (Flat market). Bekleniyor (WAIT)."
+        elif is_bullish_alignment and is_long_pullback:
             signal = SignalType.LONG
-            reason = f"LONG Onaylandı: Trend Bullish (EMA38>EMA62 & Price>EMA200), SuperTrend Bullish, StochRSI({curr_k:.1f}) Çıkış"
-        elif is_bearish_trend and is_supertrend_bear and stoch_short_signal:
+            reason = f"BUY (LONG) Onaylandı: Trend Boğa Dizilimi (EMA38 > EMA62) & Pullback Tetikleyici (Stoch_K={curr_k:.1f} < 50)."
+        elif is_bearish_alignment and is_short_pullback:
             signal = SignalType.SHORT
-            reason = f"SHORT Onaylandı: Trend Bearish (EMA38<EMA62 & Price<EMA200), SuperTrend Bearish, StochRSI({curr_k:.1f}) Çıkış"
+            reason = f"SELL (SHORT) Onaylandı: Trend Ayı Dizilimi (EMA38 < EMA62) & Pullback Tetikleyici (Stoch_K={curr_k:.1f} > 50)."
 
         return {
             "signal": signal,

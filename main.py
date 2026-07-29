@@ -19,9 +19,18 @@ background_tasks_set = set()
 
 class SettingsUpdateModel(BaseModel):
     symbol: Optional[str] = Field(None, description="Parite (örn: BTC/USDT)")
-    timeframe: Optional[str] = Field(None, description="Zaman dilimi (örn: 15m)")
-    risk_percentage: Optional[float] = Field(None, description="İşlem başına risk (örn: 0.015)")
+    timeframe: Optional[str] = Field(None, description="Zaman dilimi (örn: 5m)")
+    risk_percentage: Optional[float] = Field(None, description="İşlem başına risk (örn: 0.02)")
     max_leverage: Optional[int] = Field(None, description="Maksimum kaldıraç")
+
+
+class EvaluatePayloadModel(BaseModel):
+    current_price: Optional[float] = Field(None, description="Anlık fiyat")
+    ema_38: Optional[float] = Field(None, description="EMA 38 değeri")
+    ema_62: Optional[float] = Field(None, description="EMA 62 değeri")
+    stoch_k: Optional[float] = Field(None, description="Stoch RSI %K değeri")
+    account_balance: Optional[float] = Field(10000.0, description="Kasa bakiyesi")
+    current_position: Optional[dict] = Field(None, description="Mevcut açık pozisyon")
 
 
 @asynccontextmanager
@@ -165,6 +174,36 @@ async def trigger_manual_optimization(background_tasks: BackgroundTasks):
         "message": "Adaptif optimizasyon arka planda başlatıldı.",
         "status": "processing"
     }
+
+
+@app.post("/api/kripton/evaluate")
+async def evaluate_kripton_strategy(payload: Optional[EvaluatePayloadModel] = None):
+    """
+    KRIPTON ALGO-TRADER Otonom Strateji Motoru Endpoint'i.
+    Gelen piyasa verilerini veya botun canlı analizi üzerindeki verileri kullanarak 
+    sistem talimatı çıktı şemasına tam uyumlu JSON döndürür.
+    """
+    analysis = bot.last_analysis_result or {}
+    
+    price = payload.current_price if (payload and payload.current_price is not None) else analysis.get("close", 0.0)
+    ema_38 = payload.ema_38 if (payload and payload.ema_38 is not None) else analysis.get("ema_fast", 0.0)
+    ema_62 = payload.ema_62 if (payload and payload.ema_62 is not None) else analysis.get("ema_slow", 0.0)
+    stoch_k = payload.stoch_k if (payload and payload.stoch_k is not None) else analysis.get("stoch_k", 50.0)
+    balance = payload.account_balance if payload else bot.virtual_balance
+    position = payload.current_position if (payload and payload.current_position is not None) else (bot.open_positions[0] if bot.open_positions else None)
+
+    decision = bot.ai_engine.evaluate_kripton_prompt_schema(
+        current_price=price,
+        ema_38=ema_38,
+        ema_62=ema_62,
+        stoch_k=stoch_k,
+        account_balance=balance,
+        current_position=position,
+        symbol=settings.SYMBOL.replace("/", ""),
+        leverage=settings.MAX_LEVERAGE,
+        risk_per_trade_pct=settings.RISK_PERCENTAGE * 100
+    )
+    return decision
 
 
 if __name__ == "__main__":
