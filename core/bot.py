@@ -12,10 +12,11 @@ from utils.telegram import TelegramNotifier
 class TradingBot:
     """
     Kripton Algo-Trader - Otonom Strateji ve İşlem Yürütme Motoru
-    - Paper Trading (Gerçekçi Simülasyon)
+    - Paper Trading (Gerçekçi Simülasyon) ve Canlı Borsa Desteği
     - Komisyon (%0.05 Taker) ve Kayma (%0.02 Slippage) ile Net PnL Hesabı
     - State Management (Açık Pozisyonlar ve İşlem Geçmişi JSON Şemaları)
     - 7/24 Kesintisiz Asenkron Tarama Döngüsü ve Telegram Bildirimleri
+    - Web Dashboard HTML Arayüzü ile Tam Entegrasyon
     """
 
     def __init__(self):
@@ -52,7 +53,7 @@ class TradingBot:
         self.trade_counter: int = 1
         self.position_counter: int = 1
 
-        # State Management: Açık pozisyonlar ve İşlem Geçmişi (JSON Uyumlu)
+        # State Management: Açık pozisyonlar ve İşlem Geçmişi (JSON & Dashboard Uyumlu)
         self.open_positions: List[Dict[str, Any]] = []
         self.trade_history: List[Dict[str, Any]] = []
         self.logs: List[Dict[str, str]] = []
@@ -281,6 +282,26 @@ class TradingBot:
         self.open_positions.append(position_obj)
         self.total_trades_count += 1
 
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        trade_entry = {
+            "id": pos_id,
+            "timestamp": now_str,
+            "entry_time": datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "symbol": settings.SYMBOL,
+            "side": "BUY" if signal_type == "LONG" else "SELL",
+            "entry_price": exec_entry,
+            "position_size": round(position_size, 4),
+            "stop_loss": risk_params["stop_loss"],
+            "take_profit": risk_params["take_profit"],
+            "status": "AÇIK"
+        }
+        self.trade_history.insert(0, trade_entry)
+        if len(self.trade_history) > 50:
+            self.trade_history.pop()
+
+        logger.info(f"🚀 YENİ POZİSYON AÇILDI ({signal_type}): Giriş=${exec_entry:.2f}, Notional=${notional:.2f}")
+        self.add_log("INFO", f"🚀 YENİ İŞLEM: {signal_type} @ ${exec_entry:.2f} ({pos_id})")
+
         # Telegram Bildirimi
         icon = "🟢" if signal_type == "LONG" else "🔴"
         mode_tag = "🧪 MOD: PAPER TRADING (SİMÜLASYON)"
@@ -328,27 +349,50 @@ class TradingBot:
         trade_id = f"TRADE-{self.trade_counter:03d}"
         self.trade_counter += 1
 
-        trade_log_obj = {
-            "id": trade_id,
-            "symbol": pos["symbol"],
-            "side": signal_type,
-            "entry_time": entry_time,
-            "exit_time": datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "entry_price": entry_price,
-            "exit_price": exec_exit,
-            "exit_reason": reason,
-            "realized_pnl_gross": gross_pnl,
-            "total_fees_paid": total_fees,
-            "realized_pnl_net": net_pnl,
-            "status": "CLOSED"
-        }
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        self.trade_history.insert(0, trade_log_obj)
+        # Geçmiş işlem listesindeki ilgili kaydı kapat
+        updated_history = False
+        for t in self.trade_history:
+            if t.get("id") == pos.get("id"):
+                t["status"] = f"KAPALI ({reason})"
+                t["exit_price"] = exec_exit
+                t["realized_pnl_gross"] = gross_pnl
+                t["total_fees_paid"] = total_fees
+                t["realized_pnl_net"] = net_pnl
+                t["exit_time"] = datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
+                updated_history = True
+                break
+
+        if not updated_history:
+            trade_log_obj = {
+                "id": trade_id,
+                "timestamp": now_str,
+                "symbol": pos["symbol"],
+                "side": "BUY" if signal_type == "LONG" else "SELL",
+                "entry_time": entry_time,
+                "exit_time": datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "entry_price": entry_price,
+                "exit_price": exec_exit,
+                "exit_reason": reason,
+                "realized_pnl_gross": gross_pnl,
+                "total_fees_paid": total_fees,
+                "realized_pnl_net": net_pnl,
+                "position_size": round(position_size, 4),
+                "stop_loss": pos.get("stop_loss"),
+                "take_profit": pos.get("take_profit"),
+                "status": f"KAPALI ({reason})"
+            }
+            self.trade_history.insert(0, trade_log_obj)
+
         if len(self.trade_history) > 50:
             self.trade_history.pop()
 
         if pos in self.open_positions:
             self.open_positions.remove(pos)
+
+        logger.info(f"🔒 POZİSYON KAPATILDI ({reason}): Giriş=${entry_price:.2f}, Çıkış=${exec_exit:.2f}, Net PnL=${net_pnl:.2f}")
+        self.add_log("INFO", f"🔒 Pozisyon Kapatıldı ({reason}) @ ${exec_exit:.2f} | Net PnL: ${net_pnl:.2f}")
 
         pnl_icon = "🎉" if net_pnl > 0 else "🛑"
         telegram_msg = (
@@ -382,7 +426,8 @@ class TradingBot:
         recent = self.trade_history[:5]
         details = []
         for t in recent:
-            details.append(f"[{t['id']}] {t['side']} PnL: ${t['realized_pnl_net']:.2f} ({t['exit_reason']})")
+            pnl_val = t.get("realized_pnl_net", 0.0)
+            details.append(f"[{t.get('id')}] {t.get('side')} PnL: ${pnl_val:.2f} ({t.get('status')})")
         return f"Geçmiş ({len(self.trade_history)}): " + " ; ".join(details) + f" | Net Bakiye: ${self.virtual_balance:.2f}"
 
     def get_api_status(self) -> Dict[str, Any]:
