@@ -161,6 +161,10 @@
 <span class="material-symbols-outlined text-[16px]">stop</span>
                     Botu Durdur
                 </button>
+<button class="bg-surface-variant text-primary border border-primary/30 px-3 py-1.5 rounded font-label-caps text-label-caps flex items-center gap-1.5 hover:bg-surface-bright transition-colors glow-active" id="sound-toggle-btn" onclick="toggleAudioMute()" title="Ses Efektlerini Aç/Kapat">
+<span class="material-symbols-outlined text-[18px]" id="sound-icon">volume_up</span>
+<span id="sound-text">SES: AÇIK</span>
+</button>
 <button class="text-on-surface-variant hover:text-primary transition-colors p-2 rounded hover:bg-surface-variant" onclick="toggleSettingsModal()">
 <span class="material-symbols-outlined">settings</span>
 </button>
@@ -516,9 +520,10 @@
                     terminal.scrollTop = terminal.scrollHeight;
                 }
 
-                // Update Trade History Table
+                // Update Trade History Table & Trigger Audio FX
                 const tbody = document.getElementById('trade-history-body');
                 if (data.trades && data.trades.length > 0) {
+                    checkTradeStateChanges(data.trades);
                     tbody.innerHTML = '';
                     data.trades.forEach(t => {
                         const tr = document.createElement('tr');
@@ -546,7 +551,138 @@
             }
         }
 
-        // Poll every 3 seconds for status and 5 seconds for trades/logs
+        // --- WEB AUDIO API SES EFEKTLERİ MOTORU ---
+        let audioCtx = null;
+        let isAudioMuted = localStorage.getItem('kripton_audio_muted') === 'true';
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function toggleAudioMute() {
+            initAudio();
+            isAudioMuted = !isAudioMuted;
+            localStorage.setItem('kripton_audio_muted', isAudioMuted);
+            updateAudioUI();
+        }
+
+        function updateAudioUI() {
+            const icon = document.getElementById('sound-icon');
+            const text = document.getElementById('sound-text');
+            const btn = document.getElementById('sound-toggle-btn');
+            if (isAudioMuted) {
+                icon.innerText = 'volume_off';
+                text.innerText = 'SES: KAPALI';
+                btn.className = "bg-surface-variant text-on-surface-variant border border-outline-variant px-3 py-1.5 rounded font-label-caps text-label-caps flex items-center gap-1.5 hover:bg-surface-bright transition-colors";
+            } else {
+                icon.innerText = 'volume_up';
+                text.innerText = 'SES: AÇIK';
+                btn.className = "bg-surface-variant text-primary border border-primary/30 px-3 py-1.5 rounded font-label-caps text-label-caps flex items-center gap-1.5 hover:bg-surface-bright transition-colors glow-active";
+            }
+        }
+
+        // 1. İşlem Açılma Sesi (Futuristic High Chime)
+        function playTradeOpenSound() {
+            if (isAudioMuted) return;
+            initAudio();
+            try {
+                const now = audioCtx.currentTime;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(523.25, now);
+                osc.frequency.exponentialRampToValueAtTime(1046.50, now + 0.15);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            } catch(e) { console.error("Audio error", e); }
+        }
+
+        // 2. Kâr Al Sesi (Take Profit Victory Chime)
+        function playTakeProfitSound() {
+            if (isAudioMuted) return;
+            initAudio();
+            try {
+                const notes = [523.25, 659.25, 783.99, 1046.50];
+                const now = audioCtx.currentTime;
+                notes.forEach((freq, idx) => {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+                    gain.gain.setValueAtTime(0.25, now + idx * 0.08);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + idx * 0.08 + 0.2);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now + idx * 0.08);
+                    osc.stop(now + idx * 0.08 + 0.2);
+                });
+            } catch(e) { console.error("Audio error", e); }
+        }
+
+        // 3. Stop Loss Sesi (Alert Drop Sound)
+        function playStopLossSound() {
+            if (isAudioMuted) return;
+            initAudio();
+            try {
+                const now = audioCtx.currentTime;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(320, now);
+                osc.frequency.exponentialRampToValueAtTime(180, now + 0.25);
+                gain.gain.setValueAtTime(0.25, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            } catch(e) { console.error("Audio error", e); }
+        }
+
+        // İşlem durumu değişiklik takibi
+        const knownTrades = new Map();
+        let isFirstLoad = true;
+
+        function checkTradeStateChanges(trades) {
+            if (!trades || trades.length === 0) return;
+            trades.forEach(t => {
+                const tradeId = t.id;
+                const currentStatus = t.status || '';
+
+                if (!knownTrades.has(tradeId)) {
+                    knownTrades.set(tradeId, currentStatus);
+                    if (!isFirstLoad) {
+                        if (currentStatus === 'AÇIK') {
+                            playTradeOpenSound();
+                        } else if (currentStatus.includes('TAKE_PROFIT')) {
+                            playTakeProfitSound();
+                        } else if (currentStatus.includes('STOP_LOSS')) {
+                            playStopLossSound();
+                        }
+                    }
+                } else {
+                    const previousStatus = knownTrades.get(tradeId);
+                    if (previousStatus !== currentStatus) {
+                        knownTrades.set(tradeId, currentStatus);
+                        if (currentStatus.includes('TAKE_PROFIT')) {
+                            playTakeProfitSound();
+                        } else if (currentStatus.includes('STOP_LOSS')) {
+                            playStopLossSound();
+                        }
+                    }
+                }
+            });
+            isFirstLoad = false;
+        }
+
+        // İlklendirme
+        updateAudioUI();
         fetchStatus();
         fetchTradesAndLogs();
         setInterval(fetchStatus, 3000);

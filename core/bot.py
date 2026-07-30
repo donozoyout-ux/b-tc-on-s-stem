@@ -216,8 +216,10 @@ class TradingBot:
 
                         elif groq_action == "DAILY_TARGET_REACHED":
                             action_str = "GÜNLÜK KÂR HEDEFİNE ULAŞILDI (+%1.00)"
+                            TelegramNotifier.send_message("🎉 <b>GÜNLÜK %1.00 NET KÂR HEDEFİNE ULAŞILDI!</b>\nKâr kilitlendi, bugün yeni işlem açılmıyor.")
                         elif groq_action == "DAILY_STOP_REACHED":
                             action_str = "GÜNLÜK KAYIP EŞİĞİNE ULAŞILDI (-%2.00)"
+                            TelegramNotifier.send_message("🛑 <b>GÜNLÜK MAX KAYIP LİMİTİNE (-%2.00) ULAŞILDI!</b>\nAnapara koruması için sistem bugünlük durduruldu.")
 
                     # 4. Standart Yapılandırılmış Formatlı Terminal ve Log Çıktısı
                     open_pos_summary = self._get_open_positions_summary()
