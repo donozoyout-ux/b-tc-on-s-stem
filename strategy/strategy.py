@@ -30,8 +30,8 @@ class KriptonStrategy:
         stoch_d: int = 3,
         rsi_len: int = 8,
         stoch_len: int = 10,
-        stoch_oversold: float = 35.0,
-        stoch_overbought: float = 65.0
+        stoch_oversold: float = 45.0,
+        stoch_overbought: float = 55.0
     ):
         self.ema_fast = ema_fast
         self.ema_slow = ema_slow
@@ -91,7 +91,7 @@ class KriptonStrategy:
         ema_diff_pct = abs(fast_ema - slow_ema) / close_price if close_price > 0 else 0.0
         is_flat_or_crossing = (ema_diff_pct < 0.0005)
 
-        # 2. Pullback Tetikleyicisi (Stoch_K < 50 for Long, Stoch_K > 50 for Short)
+        # 2. Pullback Tetikleyicisi (Stoch_K < 45 for Long, Stoch_K > 55 for Short)
         is_long_pullback = (curr_k < self.stoch_oversold)
         is_short_pullback = (curr_k > self.stoch_overbought)
 
@@ -103,10 +103,10 @@ class KriptonStrategy:
             reason = "EMA38 ve EMA62 yatay/sık kesişiyor (Flat market). Bekleniyor (WAIT)."
         elif is_bullish_alignment and is_long_pullback:
             signal = SignalType.LONG
-            reason = f"BUY (LONG) Onaylandı: Trend Boğa Dizilimi (EMA38 > EMA62) & Pullback Tetikleyici (Stoch_K={curr_k:.1f} < 50)."
+            reason = f"BUY (LONG) Onaylandı: Trend Boğa Dizilimi (EMA38 > EMA62) & Pullback Tetikleyici (Stoch_K={curr_k:.1f} < 45)."
         elif is_bearish_alignment and is_short_pullback:
             signal = SignalType.SHORT
-            reason = f"SELL (SHORT) Onaylandı: Trend Ayı Dizilimi (EMA38 < EMA62) & Pullback Tetikleyici (Stoch_K={curr_k:.1f} > 50)."
+            reason = f"SELL (SHORT) Onaylandı: Trend Ayı Dizilimi (EMA38 < EMA62) & Pullback Tetikleyici (Stoch_K={curr_k:.1f} > 55)."
 
         return {
             "signal": signal,

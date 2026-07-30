@@ -60,12 +60,19 @@ class Settings(BaseSettings):
     STOCH_RSI_D: int = Field(default=3, description="Stoch RSI %D düzeltme")
     STOCH_RSI_RSI_LEN: int = Field(default=8, description="Stoch RSI - RSI periyodu")
     STOCH_RSI_STOCH_LEN: int = Field(default=10, description="Stoch RSI periyodu")
-    STOCH_RSI_OVERSOLD: float = Field(default=50.0, description="Pullback Long tetiklenme eşiği (Stoch_K < 50)")
-    STOCH_RSI_OVERBOUGHT: float = Field(default=50.0, description="Pullback Short tetiklenme eşiği (Stoch_K > 50)")
+    STOCH_RSI_OVERSOLD: float = Field(default=45.0, description="Pullback Long tetiklenme eşiği (Stoch_K < 45)")
+    STOCH_RSI_OVERBOUGHT: float = Field(default=55.0, description="Pullback Short tetiklenme eşiği (Stoch_K > 55)")
 
-    # --- Risk ve Kasa Yönetimi ---
+    # --- Risk ve Kasa Yönetimi (Günlük Scalp Hedefli) ---
     RISK_PERCENTAGE: float = Field(default=0.02, description="İşlem başına maksimum bakiye riski (0.02 = %2.0)")
+    POSITION_PCT_OF_BALANCE: float = Field(default=0.20, description="Kasa pozisyon büyüklük oranı (%20)")
     MAX_LEVERAGE: int = Field(default=5, description="Kullanılacak kaldıraç oranı")
+    
+    DAILY_TARGET_NET_PCT: float = Field(default=0.01, description="Günlük net kâr hedefi (%1.00)")
+    DAILY_STOP_NET_PCT: float = Field(default=-0.02, description="Günlük maksimum kayıp limiti (-%2.00)")
+    DEFAULT_TP_PCT: float = Field(default=0.012, description="Take-Profit oranı (+%1.20 brüt)")
+    DEFAULT_SL_PCT: float = Field(default=0.006, description="Stop-Loss oranı (-%0.60 brüt)")
+
     ATR_PERIOD: int = Field(default=14, description="ATR periyodu")
     ATR_MULTIPLIER_SL: float = Field(default=1.5, description="ATR Stop-Loss çarpanı (1.5 * ATR)")
     ATR_MULTIPLIER_TP: float = Field(default=3.0, description="ATR Take-Profit çarpanı (3.0 * ATR - 1:2 R/R)")
