@@ -1,9 +1,30 @@
 {
   "initial_balance": 10000.0,
-  "current_balance": 10000.0,
+  "current_balance": 10542.85,
   "today_date": "2026-07-30",
-  "today_pnl_usdt": 0.0,
-  "today_pnl_pct": 0.0,
+  "today_pnl_usdt": 230.38,
+  "today_pnl_pct": 2.3,
   "active_position": null,
-  "trade_history": []
+  "trade_history": [
+    {
+      "id": "TRADE-005",
+      "symbol": "BTCUSDT",
+      "side": "LONG",
+      "entry_price": 64320.0,
+      "exit_price": 64610.0,
+      "reason": "TAKE_PROFIT",
+      "net_pnl_usdt": 112.78,
+      "timestamp": "2026-07-30 14:22:30"
+    },
+    {
+      "id": "TRADE-004",
+      "symbol": "BTCUSDT",
+      "side": "SHORT",
+      "entry_price": 64850.0,
+      "exit_price": 64550.0,
+      "reason": "TAKE_PROFIT",
+      "net_pnl_usdt": 117.6,
+      "timestamp": "2026-07-30 12:05:00"
+    }
+  ]
 }
