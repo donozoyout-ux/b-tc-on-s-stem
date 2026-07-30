@@ -1,0 +1,9 @@
+{
+  "initial_balance": 10000.0,
+  "current_balance": 10000.0,
+  "today_date": "2026-07-30",
+  "today_pnl_usdt": 0.0,
+  "today_pnl_pct": 0.0,
+  "active_position": null,
+  "trade_history": []
+}
