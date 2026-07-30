@@ -1,6 +1,9 @@
 import pandas as pd
 import numpy as np
+import requests
+import json
 from typing import Dict, Any, Optional
+from config import settings
 from utils.logger import logger
 
 
@@ -259,35 +262,63 @@ class AIDecisionEngine:
                     }
                 }
 
-        # STEP 2: Pozisyon yoksa strateji kurallarını tara (5m Mumlar: Stoch_K < 45 / > 55)
+        # STEP 2: Pozisyon yoksa strateji kurallarını tara (5m Mumlar)
         is_bullish_alignment = (ema_38 > ema_62)
         is_bearish_alignment = (ema_38 < ema_62)
         
         ema_diff_pct = abs(ema_38 - ema_62) / current_price if current_price > 0 else 0.0
         is_flat = (ema_diff_pct < 0.0005)
 
+        # ⚡ 1. İNDİKATÖR ÖZEL DURUMU (FLASH GATE): Ekstrem durumlarda yapay zeka onayını beklemeden DİREKT AL/SAT
+        is_flash_buy = is_bullish_alignment and (stoch_k < 25.0)
+        is_flash_sell = is_bearish_alignment and (stoch_k > 75.0)
+
         is_long_pullback = (stoch_k < 45.0)
         is_short_pullback = (stoch_k > 55.0)
+
+        # Dinamik risk ölçeklendirmesi
+        risk_factor = 1.0
+        if today_pnl_net_pct >= 0.007:
+            risk_factor = 0.5  # Hedefe yakın kâr koruması
+        elif today_pnl_net_pct <= -0.01:
+            risk_factor = 0.6  # Kayıp koruması
+
+        position_size_usdt = round(account_balance * position_pct_of_balance * leverage * risk_factor, 2)
 
         action = "WAIT"
         side = "NONE"
         entry_price = 0.0
         stop_loss = 0.0
         take_profit = 0.0
-        position_size_usdt = 0.0
         reasoning = "EMA_38 ve EMA_62 yatay/nötr veya Stoch_K sinyal koşulları karşılanmadı (WAIT)."
 
-        if is_flat:
+        if is_flash_buy:
+            action = "DIRECT_BUY"
+            side = "LONG"
+            entry_price = current_price * (1 + (slippage_pct / 100))
+            stop_loss = round(entry_price * 0.994, 2)   # -0.60% Brüt Stop Loss
+            take_profit = round(entry_price * 1.012, 2) # +1.20% Brüt Take Profit
+            reasoning = f"⚡ İNDİKATÖR ÖZEL DURUMU (FLASH GATE): EMA_38 > EMA_62 Boğa trendinde Stoch_K ({stoch_k:.1f} < 25) dip seviyesine ulaştı. Anında DİREKT ALIM (DIRECT_BUY)!"
+
+        elif is_flash_sell:
+            action = "DIRECT_SELL"
+            side = "SHORT"
+            entry_price = current_price * (1 - (slippage_pct / 100))
+            stop_loss = round(entry_price * 1.006, 2)   # +0.60% Brüt Stop Loss
+            take_profit = round(entry_price * 0.988, 2) # -1.20% Brüt Take Profit
+            reasoning = f"⚡ İNDİKATÖR ÖZEL DURUMU (FLASH GATE): EMA_38 < EMA_62 Ayı trendinde Stoch_K ({stoch_k:.1f} > 75) zirve seviyesine ulaştı. Anında DİREKT SATIM (DIRECT_SELL)!"
+
+        elif is_flat:
             action = "WAIT"
             reasoning = "EMA_38 ve EMA_62 yatay seyrediyor ve sıklıkla kesişiyor. Aksiyon: WAIT."
+
         elif is_bullish_alignment and is_long_pullback:
             action = "BUY"
             side = "LONG"
             entry_price = current_price * (1 + (slippage_pct / 100))
             stop_loss = round(entry_price * 0.994, 2)   # -0.60% Brüt Stop Loss
             take_profit = round(entry_price * 1.012, 2) # +1.20% Brüt Take Profit
-            position_size_usdt = round(account_balance * position_pct_of_balance * leverage, 2)
-            reasoning = f"BUY (LONG): EMA_38 (${ema_38:.2f}) > EMA_62 (${ema_62:.2f}) yükseliş trendi & Stoch_K ({stoch_k:.1f} < 45) düzeltme bölgesi."
+            reasoning = f"🤖 AI DESTEKLİ BUY (LONG): EMA_38 (${ema_38:.2f}) > EMA_62 (${ema_62:.2f}) & Stoch_K ({stoch_k:.1f} < 45) düzeltme bölgesi."
 
         elif is_bearish_alignment and is_short_pullback:
             action = "SELL"
@@ -295,8 +326,7 @@ class AIDecisionEngine:
             entry_price = current_price * (1 - (slippage_pct / 100))
             stop_loss = round(entry_price * 1.006, 2)   # +0.60% Brüt Stop Loss
             take_profit = round(entry_price * 0.988, 2) # -1.20% Brüt Take Profit
-            position_size_usdt = round(account_balance * position_pct_of_balance * leverage, 2)
-            reasoning = f"SELL (SHORT): EMA_38 (${ema_38:.2f}) < EMA_62 (${ema_62:.2f}) düşüş trendi & Stoch_K ({stoch_k:.1f} > 55) tepki bölgesi."
+            reasoning = f"🤖 AI DESTEKLİ SELL (SHORT): EMA_38 (${ema_38:.2f}) < EMA_62 (${ema_62:.2f}) & Stoch_K ({stoch_k:.1f} > 55) tepki bölgesi."
 
         return {
             "action": action,
@@ -310,3 +340,99 @@ class AIDecisionEngine:
                 "position_size_usdt": round(position_size_usdt, 2)
             }
         }
+
+    def call_groq_llm_analyst(
+        self,
+        current_price: float,
+        ema_38: float,
+        ema_62: float,
+        stoch_k: float,
+        account_balance: float = 10000.0,
+        current_position: Optional[Dict[str, Any]] = None,
+        today_pnl_net_pct: float = 0.0
+    ) -> Dict[str, Any]:
+        """
+        Groq Cloud LLM (Llama 3.3 70B) API ile canlı piyasa verisini analiz eder.
+        Flash Gate (İndikatör Özel Durumu) aktifse anında DIRECT_BUY/DIRECT_SELL kararı verir.
+        Aksi halde Groq AI API çağrısı ile otonom karar üretir.
+        """
+        # 1. Yerel kural motorunu çalıştır (Flash Gate & Günlük Limit denetimi için)
+        local_decision = self.evaluate_kripton_prompt_schema(
+            current_price=current_price,
+            ema_38=ema_38,
+            ema_62=ema_62,
+            stoch_k=stoch_k,
+            account_balance=account_balance,
+            current_position=current_position,
+            today_pnl_net_pct=today_pnl_net_pct
+        )
+
+        # ⚡ Flaş durumlar veya günlük limitler tetiklendiyse Groq API beklemeden anında dön
+        if local_decision["action"] in ["DIRECT_BUY", "DIRECT_SELL", "CLOSE", "DAILY_TARGET_REACHED", "DAILY_STOP_REACHED"]:
+            local_decision["groq_ai_used"] = False
+            local_decision["execution_mode"] = "FLASH_GATE_DIRECT"
+            return local_decision
+
+        # 2. Groq Cloud AI API Çağrısı Yap
+        api_key = settings.GROQ_API_KEY
+        if not api_key:
+            local_decision["groq_ai_used"] = False
+            local_decision["execution_mode"] = "LOCAL_RULE_FALLBACK"
+            return local_decision
+
+        system_prompt = (
+            "Sen KRIPTON ALGO-TRADER adında, 5m BTCUSDT vadeli işlemlerinde GÜNLÜK NET %1 KÂR HEDEFİYLE "
+            "çalışan otonom bir yapay zeka işlem ajansısın.\n\n"
+            "KURALLAR:\n"
+            "- Günlük Net Kâr Hedefi: +%1.00 Net PnL (Bugün ulaşıldıysa action: 'DAILY_TARGET_REACHED')\n"
+            "- Günlük Max Kayıp Limiti: -%2.00 Net PnL (Bugün ulaşıldıysa action: 'DAILY_STOP_REACHED')\n"
+            "- BUY (LONG): EMA_38 > EMA_62 ve Stoch_K < 45 (TP: +%1.20, SL: -%0.60)\n"
+            "- SELL (SHORT): EMA_38 < EMA_62 ve Stoch_K > 55 (TP: -%1.20, SL: +%0.60)\n"
+            "- WAIT: Koşul uymazsa risk alma.\n\n"
+            "ÇIKTI FORMATI: Sadece ve sadece geçerli JSON objesi üret. Markdown backtick kullanma."
+        )
+
+        user_prompt = json.dumps({
+            "current_price": current_price,
+            "ema_38": ema_38,
+            "ema_62": ema_62,
+            "stoch_k": stoch_k,
+            "account_balance": account_balance,
+            "current_position": current_position,
+            "today_pnl_net_pct": today_pnl_net_pct
+        })
+
+        try:
+            url = "https://api.groq.com/openai/v1/chat/completions"
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            }
+            payload = {
+                "model": settings.GROQ_MODEL,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": f"Anlık Veriler: {user_prompt}"}
+                ],
+                "temperature": 0.1,
+                "response_format": {"type": "json_object"}
+            }
+
+            resp = requests.post(url, headers=headers, json=payload, timeout=5)
+            if resp.status_code == 200:
+                result_json = resp.json()
+                content_str = result_json["choices"][0]["message"]["content"]
+                parsed_decision = json.loads(content_str)
+                parsed_decision["groq_ai_used"] = True
+                parsed_decision["execution_mode"] = "GROQ_LLM_AI"
+                logger.info(f"🧠 Groq Cloud AI Analizi Başarılı: {parsed_decision.get('action')}")
+                return parsed_decision
+            else:
+                logger.warning(f"Groq API Hatası: Status {resp.status_code}, yerel motora geçiliyor.")
+
+        except Exception as e:
+            logger.error(f"Groq API çağrısında istisna: {str(e)}, yerel motor kullanılıyor.")
+
+        local_decision["groq_ai_used"] = False
+        local_decision["execution_mode"] = "LOCAL_RULE_FALLBACK"
+        return local_decision

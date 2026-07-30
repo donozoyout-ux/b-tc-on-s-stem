@@ -27,14 +27,52 @@ class RiskManager:
         self.taker_fee_rate = taker_fee_rate
         self.slippage_rate = slippage_rate
 
+    def calculate_dynamic_daily_risk(
+        self,
+        account_balance: float,
+        today_net_pnl_pct: float = 0.0,
+        target_net_pct: float = 0.01,
+        stop_net_pct: float = -0.02,
+        base_position_pct: float = 0.20
+    ) -> Dict[str, Any]:
+        """
+        Günlük %1 Net Kâr Hedefi ve Günlük Maksimum %2 Kayıp Limitine göre 
+        dinamik pozisyon büyüklüğü ve işlem başı risk oranı hesaplar.
+        """
+        remaining_target_pct = max(0.0, target_net_pct - today_net_pnl_pct)
+        
+        # Risk ölçeklendirme faktörü
+        scale_factor = 1.0
+        risk_note = "Standart Günlük Risk Oranı (%20 Kasa x 5x Kaldıraç)"
+
+        if today_net_pnl_pct >= 0.007:  # Hedefin %70'inden fazlasına ulaşıldıysa riski düşür (Kârı Koru)
+            scale_factor = 0.5
+            risk_note = "🛡️ Günlük kâr hedefine çok yaklaşıldı (%0.7+). Kârı korumak için pozisyon riski %50 düşürüldü."
+        elif today_net_pnl_pct <= -0.01: # Kayıp limitinin yarısına gelindiğinde riski düşür
+            scale_factor = 0.6
+            risk_note = "⚠️ Günlük kayıp eşiğinin yarısına ulaşıldı (-%1.0). Anapara koruması için risk %40 düşürüldü."
+
+        effective_pos_pct = base_position_pct * scale_factor
+        recommended_notional = account_balance * effective_pos_pct * self.max_leverage
+
+        return {
+            "account_balance": round(account_balance, 2),
+            "today_net_pnl_pct": round(today_net_pnl_pct * 100, 2),
+            "remaining_target_pct": round(remaining_target_pct * 100, 2),
+            "effective_pos_pct": round(effective_pos_pct * 100, 1),
+            "recommended_notional_usdt": round(recommended_notional, 2),
+            "scale_factor": scale_factor,
+            "risk_note": risk_note
+        }
+
     def calculate_position_parameters(
         self,
         account_balance: float,
         entry_price: float,
         atr: float = 0.0,
         signal_type: str = "LONG",
-        sl_pct: float = 0.01,
-        tp_pct: float = 0.02
+        sl_pct: float = 0.006,
+        tp_pct: float = 0.012
     ) -> Dict[str, Any]:
         """
         Giriş fiyatı, ATR veya Sabit Yüzde (SL: %1.0, TP: %2.0) verisine dayanarak Stop-Loss, Take-Profit ve Pozisyon Miktarını hesaplar.

@@ -43,6 +43,16 @@ class Settings(BaseSettings):
         description="Telegram Chat ID"
     )
 
+    # --- Yapay Zeka (Groq AI) Entegrasyonu ---
+    GROQ_API_KEY: str = Field(
+        default_factory=lambda: os.getenv("GROQ_API_KEY", ""),
+        description="Groq Cloud API Key"
+    )
+    GROQ_MODEL: str = Field(
+        default="llama-3.3-70b-versatile",
+        description="Groq AI Modeli (llama-3.3-70b-versatile, mixtral-8x7b-32768, llama3-70b-8192)"
+    )
+
     # --- İşlem ve Parite Ayarları ---
     SYMBOL: str = Field(default="BTC/USDT", description="İşlem yapılacak sembol (örn: BTC/USDT)")
     TIMEFRAME: str = Field(default="5m", description="Mum zaman dilimi (1m, 5m, 15m, 1h, 4h)")

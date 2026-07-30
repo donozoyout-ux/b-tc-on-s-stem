@@ -177,10 +177,10 @@ async def trigger_manual_optimization(background_tasks: BackgroundTasks):
 
 
 @app.post("/api/kripton/evaluate")
-async def evaluate_kripton_strategy(payload: Optional[EvaluatePayloadModel] = None):
+async def evaluate_kripton_strategy(payload: Optional[EvaluatePayloadModel] = None, use_groq: bool = True):
     """
     KRIPTON ALGO-TRADER Otonom Strateji Motoru Endpoint'i.
-    Gelen piyasa verilerini veya botun canlı analizi üzerindeki verileri kullanarak 
+    Groq Cloud AI (Llama 3.3 70B) veya Flaş İndikatör Kapısını (Flash Gate) kullanarak
     sistem talimatı çıktı şemasına tam uyumlu JSON döndürür.
     """
     analysis = bot.last_analysis_result or {}
@@ -192,17 +192,24 @@ async def evaluate_kripton_strategy(payload: Optional[EvaluatePayloadModel] = No
     balance = payload.account_balance if payload else bot.virtual_balance
     position = payload.current_position if (payload and payload.current_position is not None) else (bot.open_positions[0] if bot.open_positions else None)
 
-    decision = bot.ai_engine.evaluate_kripton_prompt_schema(
-        current_price=price,
-        ema_38=ema_38,
-        ema_62=ema_62,
-        stoch_k=stoch_k,
-        account_balance=balance,
-        current_position=position,
-        symbol=settings.SYMBOL.replace("/", ""),
-        leverage=settings.MAX_LEVERAGE,
-        risk_per_trade_pct=settings.RISK_PERCENTAGE * 100
-    )
+    if use_groq:
+        decision = bot.ai_engine.call_groq_llm_analyst(
+            current_price=price,
+            ema_38=ema_38,
+            ema_62=ema_62,
+            stoch_k=stoch_k,
+            account_balance=balance,
+            current_position=position
+        )
+    else:
+        decision = bot.ai_engine.evaluate_kripton_prompt_schema(
+            current_price=price,
+            ema_38=ema_38,
+            ema_62=ema_62,
+            stoch_k=stoch_k,
+            account_balance=balance,
+            current_position=position
+        )
     return decision
 
 

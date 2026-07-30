@@ -180,14 +180,44 @@ class TradingBot:
                     if self.open_positions:
                         action_str = await self._manage_open_positions(current_price, atr)
 
-                    # 3. Pozisyon yoksa ve sinyal onaylandıysa AI Süzgecinden geçir
-                    elif signal in [SignalType.LONG, SignalType.SHORT]:
-                        ai_check = self.ai_engine.validate_signal(signal.value, df, analysis)
-                        if ai_check["approved"]:
-                            action_str = await self._open_position(signal.value, current_price, atr, ai_check)
-                        else:
-                            action_str = f"AI REDDETTİ ({ai_check['verdict']})"
-                            self.add_log("WARN", f"🤖 AI Sinyali Filtreledi: {ai_check['verdict']}")
+                    # 3. Pozisyon yoksa Groq AI LLM Analisti ve Flash İndikatör Kapısını Çalıştır
+                    else:
+                        fast_ema = analysis.get("ema_fast", 0.0)
+                        slow_ema = analysis.get("ema_slow", 0.0)
+                        groq_decision = self.ai_engine.call_groq_llm_analyst(
+                            current_price=current_price,
+                            ema_38=fast_ema,
+                            ema_62=slow_ema,
+                            stoch_k=stoch_k,
+                            account_balance=self.virtual_balance,
+                            current_position=None
+                        )
+                        
+                        groq_action = groq_decision.get("action", "WAIT")
+                        exec_mode = groq_decision.get("execution_mode", "LOCAL")
+
+                        if groq_action in ["BUY", "DIRECT_BUY"]:
+                            ai_check = {
+                                "approved": True,
+                                "confidence": 95.0 if groq_action == "DIRECT_BUY" else 88.0,
+                                "reason": groq_decision.get("reasoning", "Groq AI / Flash Gate Onayladı")
+                            }
+                            action_str = await self._open_position("LONG", current_price, atr, ai_check)
+                            self.add_log("INFO", f"🚀 [{exec_mode}] LONG İşlem Açıldı @ ${current_price:.2f}")
+
+                        elif groq_action in ["SELL", "DIRECT_SELL"]:
+                            ai_check = {
+                                "approved": True,
+                                "confidence": 95.0 if groq_action == "DIRECT_SELL" else 88.0,
+                                "reason": groq_decision.get("reasoning", "Groq AI / Flash Gate Onayladı")
+                            }
+                            action_str = await self._open_position("SHORT", current_price, atr, ai_check)
+                            self.add_log("INFO", f"🚀 [{exec_mode}] SHORT İşlem Açıldı @ ${current_price:.2f}")
+
+                        elif groq_action == "DAILY_TARGET_REACHED":
+                            action_str = "GÜNLÜK KÂR HEDEFİNE ULAŞILDI (+%1.00)"
+                        elif groq_action == "DAILY_STOP_REACHED":
+                            action_str = "GÜNLÜK KAYIP EŞİĞİNE ULAŞILDI (-%2.00)"
 
                     # 4. Standart Yapılandırılmış Formatlı Terminal ve Log Çıktısı
                     open_pos_summary = self._get_open_positions_summary()
